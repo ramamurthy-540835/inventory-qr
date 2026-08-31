@@ -5,3 +5,5 @@ node_modules/
 *.log
 coverage/
 .DS_Store
+rzp-key.csv
+razorpay-webhook-secret.txt

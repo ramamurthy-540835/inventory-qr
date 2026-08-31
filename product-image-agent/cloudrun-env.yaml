@@ -1,0 +1,5 @@
+GOOGLE_CLOUD_PROJECT: aidirac-503309
+GCS_BUCKET: aidirac-503309-grocery-public-images
+BIGQUERY_DATASET: grocery_analytics
+BIGQUERY_TABLE: product_images
+CORS_ORIGINS: https://aidirac-grocery-admin.web.app,https://aidirac-grocery-customer.web.app
