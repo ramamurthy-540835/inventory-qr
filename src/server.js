@@ -12,6 +12,9 @@ const storage = new Storage({ projectId });
 const app = express();
 app.use(express.json());
 
+app.get('/', (req, res) => res.json({ service: 'inventory-management-api', status: 'ok', health: '/health' }));
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
 const table = name => `\`${projectId}.${datasetId}.${name}\``;
 const now = () => new Date().toISOString();
 const id = prefix => `${prefix}-${crypto.randomUUID()}`;
