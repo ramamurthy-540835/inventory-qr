@@ -60,10 +60,8 @@ app.post('/payments/verify', async (req, res, next) => { try { const expected = 
 const table = name => `\`${projectId}.${datasetId}.${name}\``;
 const now = () => new Date().toISOString();
 const id = prefix => `${prefix}-${crypto.randomUUID()}`;
-const customerId = name => {
-  const letters = String(name).replace(/[^a-z]/gi, '').slice(0, 4).toUpperCase().padEnd(4, 'X');
-  return `${letters}${crypto.randomInt(100, 1000)}`;
-};
+// Internal customer UID: 128-bit cryptographically random hexadecimal identifier.
+const customerId = () => crypto.randomBytes(16).toString('hex');
 function inferProductDetails(name) {
   const value = String(name).toLowerCase();
   const matches = [
@@ -173,11 +171,14 @@ app.patch('/inventory/:id/quantity', async (req, res, next) => { try {
   await rows(`UPDATE ${table('inventory_stock')} SET quantity=@quantity, updated_at=CURRENT_TIMESTAMP() WHERE stock_id=@id`, { quantity: req.body.quantity, id: req.params.id }); res.sendStatus(204);
 } catch (e) { next(e); } });
 app.post('/customers', async (req, res, next) => { try {
-  const x = req.body; if (!x.customer_name) return fail(res, 400, 'customer_name is required');
-  const generatedId = String(x.customer_id || '').trim();
-  if (!/^[A-Za-z0-9_-]{1,15}$/.test(generatedId)) return fail(res, 400, 'customer_id is required and must use up to 15 letters, numbers, hyphens, or underscores');
-  const existing = await rows(`SELECT 1 FROM ${table('customers')} WHERE customer_id=@id LIMIT 1`, { id: generatedId });
-  if (existing.length) return fail(res, 409, 'customer_id already exists; choose a different ID');
+  const { customer_id: _clientCustomerId, ...x } = req.body; if (!x.customer_name) return fail(res, 400, 'customer_name is required');
+  let generatedId;
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    const candidate = customerId();
+    const existing = await rows(`SELECT 1 FROM ${table('customers')} WHERE customer_id=@id LIMIT 1`, { id: candidate });
+    if (!existing.length) { generatedId = candidate; break; }
+  }
+  if (!generatedId) return fail(res, 503, 'Unable to create a unique customer account ID. Please try again.');
   const timestamp = now();
   const customer = await insert('customers', { ...x, customer_id: generatedId, created_at: timestamp, updated_at: timestamp }); await startSession(res, customer); res.status(201).json(customer);
 } catch (e) { next(e); } });
