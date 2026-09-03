@@ -1,0 +1,17 @@
+{
+  "name": "grocery-qr-api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "dev": "node --watch src/index.js", "start": "node src/index.js", "test": "node --test" },
+  "dependencies": {
+    "@google-cloud/bigquery": "^7.9.4",
+    "@google-cloud/storage": "^7.15.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "firebase-admin": "^13.0.2",
+    "helmet": "^8.0.0",
+    "qrcode": "^1.5.4",
+    "zod": "^3.24.1"
+  }
+}

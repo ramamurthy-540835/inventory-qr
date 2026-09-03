@@ -61,6 +61,13 @@ CREATE TABLE IF NOT EXISTS `customer-grocery-507211.inventory_management.orders`
   delivery_address STRING,
   order_status STRING,
   payment_status STRING,
+  inventory_stock_id STRING,
+  razorpay_payment_link_id STRING,
+  razorpay_payment_link_status STRING,
+  razorpay_payment_id STRING,
+  payment_link_url STRING,
+  payment_received_at TIMESTAMP,
+  inventory_committed_at TIMESTAMP,
   qr_id STRING NOT NULL,
   qr_image_gcs_uri STRING,
   created_at TIMESTAMP NOT NULL,
@@ -68,6 +75,15 @@ CREATE TABLE IF NOT EXISTS `customer-grocery-507211.inventory_management.orders`
 )
 PARTITION BY DATE(order_date)
 CLUSTER BY customer_id, order_status;
+
+-- Safe migration for an existing installation created with an earlier schema.
+ALTER TABLE `customer-grocery-507211.inventory_management.orders` ADD COLUMN IF NOT EXISTS inventory_stock_id STRING;
+ALTER TABLE `customer-grocery-507211.inventory_management.orders` ADD COLUMN IF NOT EXISTS razorpay_payment_link_id STRING;
+ALTER TABLE `customer-grocery-507211.inventory_management.orders` ADD COLUMN IF NOT EXISTS razorpay_payment_link_status STRING;
+ALTER TABLE `customer-grocery-507211.inventory_management.orders` ADD COLUMN IF NOT EXISTS razorpay_payment_id STRING;
+ALTER TABLE `customer-grocery-507211.inventory_management.orders` ADD COLUMN IF NOT EXISTS payment_link_url STRING;
+ALTER TABLE `customer-grocery-507211.inventory_management.orders` ADD COLUMN IF NOT EXISTS payment_received_at TIMESTAMP;
+ALTER TABLE `customer-grocery-507211.inventory_management.orders` ADD COLUMN IF NOT EXISTS inventory_committed_at TIMESTAMP;
 
 -- Useful BigQuery queries
 -- Customer orders: SELECT * FROM `customer-grocery-507211.inventory_management.orders` WHERE customer_id = @customer_id ORDER BY order_date DESC;
