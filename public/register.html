@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2874f0">
+  <title>Create your Nelture account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/register.css">
+  <link rel="stylesheet" href="/logo-tweak.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="brand-panel" aria-label="Nelture membership benefits">
+      <a class="brand" href="/register" aria-label="Nelture home"><img class="brand-mark" src="/nelture-logo.png" alt=""><span>Nelture<span class="dot">.ai</span></span></a>
+      <div class="intro">
+        <p class="eyebrow">WELCOME TO NELTURE</p>
+        <h1>Everything you need,<br><em>grown around you.</em></h1>
+        <p class="intro-copy">Create your account to manage orders, discover everyday essentials, and enjoy a more personal shopping experience.</p>
+      </div>
+      <ul class="benefits">
+        <li><span class="benefit-icon">✓</span><span><strong>Easy order tracking</strong><small>Follow every purchase from checkout to doorstep.</small></span></li>
+        <li><span class="benefit-icon">✦</span><span><strong>Saved addresses &amp; faster checkout</strong><small>Keep your essentials just a few taps away.</small></span></li>
+        <li><span class="benefit-icon">♧</span><span><strong>Offers picked for you</strong><small>Be first to know about relevant savings.</small></span></li>
+      </ul>
+      <p class="panel-footer">© 2026 Nelture.ai · Made for everyday living</p>
+    </section>
+
+    <section class="form-panel">
+      <div class="form-wrap">
+        <a class="mobile-brand brand" href="/register"><img class="brand-mark" src="/nelture-logo.png" alt=""><span>Nelture<span class="dot">.ai</span></span></a>
+        <p class="step"><span>01</span> / 02 &nbsp; CREATE ACCOUNT</p>
+        <h2>Join Nelture</h2>
+        <p class="subhead">Already have an account? <a href="/login">Sign in</a></p>
+        <form id="registration-form" novalidate>
+          <div class="field-group full">
+            <label for="customer_name">Full name</label>
+            <input id="customer_name" name="customer_name" type="text" autocomplete="name" placeholder="Enter your full name" required>
+            <span class="field-error"></span>
+          </div>
+          <div class="field-group full">
+            <label for="customer_id">Customer ID</label>
+            <input id="customer_id" name="customer_id" type="text" maxlength="15" autocomplete="username" placeholder="Choose up to 15 letters or numbers" required>
+            <span class="field-error"></span>
+          </div>
+          <div class="two-columns">
+            <div class="field-group">
+              <label for="phone_number">Mobile number</label>
+              <div class="phone-input"><span>+91</span><input id="phone_number" name="phone_number" type="tel" inputmode="numeric" autocomplete="tel" placeholder="10-digit number" required></div>
+              <span class="field-error"></span>
+            </div>
+            <div class="field-group">
+              <label for="email">Email address <i>Optional</i></label>
+              <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com">
+              <span class="field-error"></span>
+            </div>
+          </div>
+          <div class="field-group full">
+            <label for="address">Delivery address</label>
+            <textarea id="address" name="address" autocomplete="street-address" placeholder="House no., street, area" required></textarea>
+            <span class="field-error"></span>
+          </div>
+          <div class="three-columns">
+            <div class="field-group"><label for="postal_code">PIN code</label><input id="postal_code" name="postal_code" inputmode="numeric" maxlength="6" placeholder="600001" required><span class="field-error"></span></div>
+            <div class="field-group"><label for="city">City</label><input id="city" name="city" autocomplete="address-level2" placeholder="Chennai" required><span class="field-error"></span></div>
+            <div class="field-group"><label for="state">State</label><input id="state" name="state" autocomplete="address-level1" placeholder="Tamil Nadu" required><span class="field-error"></span></div>
+          </div>
+          <label class="check-row"><input type="checkbox" id="terms" required><span>I agree to Nelture’s <a href="#terms">Terms of Use</a> and <a href="#privacy">Privacy Policy</a>.</span></label>
+          <button class="submit-btn" type="submit"><span>Create account</span><b>→</b></button>
+          <p class="secure-note"><span>⌁</span> Your details are protected and never shared without permission.</p>
+          <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+  </main>
+  <script src="/register.js"></script>
+</body>
+</html>

@@ -17,8 +17,8 @@ The bucket folders are prefixes (not physical directories): `materials/`, `inven
 
 ## API
 
-`POST /materials`, `PATCH /materials/:id/price`, `POST /inventory`, `PATCH /inventory/:id/quantity`, `POST /customers`, `POST /orders`, `PATCH /orders/:id/status`, `POST /exports/:tableName`.
+`POST /materials`, `PATCH /materials/:id/price`, `POST /inventory`, `PATCH /inventory/:id/quantity`, `POST /customers`, `PATCH /customers/:id`, `POST /orders`, `PATCH /orders/:id/status`, `POST /exports/:tableName`.
 
-The service rejects duplicate customer IDs, never exposes a customer-ID update route, creates UUID-based material/stock/order IDs, and makes each QR ID from a five-letter customer/order hash + a microsecond sequence + a postcode-derived two-letter location code. It verifies QR uniqueness before insert and uploads the PNG to `qr-codes/`.
+Customer IDs are created by the API as the first four alphabetic characters of the customer name plus three random digits (for example, `ANUR482`). The service checks each generated ID for duplicates, never exposes a customer-ID update route, sets `created_at` and `updated_at` to the current timestamp on creation, and refreshes `updated_at` on every customer modification. It creates UUID-based material/stock/order IDs and makes each QR ID from a five-letter customer/order hash + a microsecond sequence + a postcode-derived two-letter location code. It verifies QR uniqueness before insert and uploads the PNG to `qr-codes/`.
 
 Grant the deployed service account `roles/bigquery.dataEditor`, `roles/bigquery.jobUser`, and `roles/storage.objectAdmin` scoped to this dataset/bucket.

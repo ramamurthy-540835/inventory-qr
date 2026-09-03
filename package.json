@@ -3,11 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node src/server.js", "dev": "node --watch src/server.js" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
   "dependencies": {
     "@google-cloud/bigquery": "^7.9.0",
     "@google-cloud/storage": "^7.14.0",
+    "cors": "^2.8.6",
     "express": "^4.21.2",
-    "qrcode": "^1.5.4"
+    "firebase-admin": "^14.3.0",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.35.4"
   }
 }

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#146f3e">
+  <title>Nelture Admin</title>
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body class="admin-login-page">
+  <main class="admin-login-shell">
+    <section class="admin-login-story" aria-label="Nelture administration">
+      <a class="admin-brand" href="/app/">
+        <img src="/nelture-logo.png" alt="Nelture logo">
+        <span>Nelture<span>.ai</span></span>
+      </a>
+      <div class="admin-story-copy">
+        <p class="eyebrow">GROCERY OPERATIONS</p>
+        <h1>Run every aisle<br>with clarity.</h1>
+        <p>Manage your product catalogue, stock levels and customer orders from one calm, secure workspace.</p>
+      </div>
+      <div class="admin-story-points">
+        <span>✓ Live inventory</span><span>✓ Order overview</span><span>✓ Secure access</span>
+      </div>
+    </section>
+
+    <section class="admin-login-card" aria-labelledby="admin-login-title">
+      <div class="admin-mobile-brand"><img src="/nelture-logo.png" alt=""><strong>Nelture<span>.ai</span></strong></div>
+      <p class="eyebrow">ADMIN PORTAL</p>
+      <h2 id="admin-login-title">Welcome back</h2>
+      <p class="login-subtitle">Sign in to manage your Nelture grocery store.</p>
+      <form id="login" novalidate>
+        <label for="password">Admin password</label>
+        <div class="password-wrap">
+          <input id="password" type="password" autocomplete="current-password" placeholder="Enter your password" required autofocus>
+          <button type="button" class="password-toggle" aria-label="Show password" aria-pressed="false">Show</button>
+        </div>
+        <p id="message" class="login-message" role="alert" aria-live="polite"></p>
+        <button id="submit" class="admin-login-submit" type="submit">Sign in to dashboard <span>→</span></button>
+      </form>
+      <p class="admin-login-help">For authorized Nelture staff only.</p>
+      <a class="return-store" href="/app/">← Return to customer store</a>
+    </section>
+  </main>
+  <script>
+    const form = document.querySelector('#login');
+    const input = document.querySelector('#password');
+    const toggle = document.querySelector('.password-toggle');
+    const message = document.querySelector('#message');
+    const submit = document.querySelector('#submit');
+    toggle.onclick = () => { const visible = input.type === 'text'; input.type = visible ? 'password' : 'text'; toggle.textContent = visible ? 'Show' : 'Hide'; toggle.setAttribute('aria-pressed', String(!visible)); toggle.setAttribute('aria-label', visible ? 'Show password' : 'Hide password'); };
+    form.onsubmit = async event => {
+      event.preventDefault(); message.textContent = '';
+      if (!input.value) { message.textContent = 'Enter the admin password to continue.'; input.focus(); return; }
+      submit.disabled = true; submit.innerHTML = 'Signing in…';
+      try {
+        const response = await fetch('/admin/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: input.value }) });
+        if (!response.ok) throw new Error((await response.json()).error || 'Unable to sign in');
+        location.assign('/admin');
+      } catch (error) { message.textContent = error.message; input.select(); submit.disabled = false; submit.innerHTML = 'Sign in to dashboard <span>→</span>'; }
+    };
+  </script>
+</body>
+</html>

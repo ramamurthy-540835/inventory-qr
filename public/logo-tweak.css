@@ -1,0 +1,6 @@
+/* Deliberately kept separate so the brand mark can be adjusted without changing the core layout. */
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+}

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nelture Admin</title><link rel="stylesheet" href="/admin.css"></head>
+<body><header><a href="/app/">Nelture.ai</a><span>Admin dashboard</span><button id="logout">Logout</button></header>
+<main>
+  <section class="hero"><div><p>OPERATIONS CENTER</p><h1>Manage your grocery business</h1></div><a href="/app/">View customer app →</a></section>
+  <section id="stats" class="stats"></section>
+  <section class="panel product-create-panel">
+    <div class="panel-head"><div><h2 id="product-form-title">Add a product</h2><p class="muted">Category and product image are selected automatically from the product name.</p></div><button class="add-product-button" id="show-product-form">+ Add product</button></div>
+    <form id="product-form" class="product-form" hidden>
+      <label>Product name<input name="name" required placeholder="e.g. Ponni Rice"></label>
+      <label>Brand <span class="optional">(optional)</span><input name="brand" placeholder="Defaults to Nelture"></label>
+      <label>Unit / size<input name="unit" required placeholder="e.g. 1 kg"></label>
+      <label>Selling price (₹)<input name="price" required type="number" min="0" step="0.01" placeholder="0.00"></label>
+      <label>MRP (₹)<input name="mrp" type="number" min="0" step="0.01" placeholder="Same as price if empty"></label>
+      <label>Stock quantity<input name="stock" required type="number" min="0" step="1" value="0"></label>
+      <div class="product-form-actions wide"><p id="product-form-message" class="form-message" role="alert"></p><button type="button" id="cancel-product-form" class="cancel-button">Cancel</button><button type="submit" class="create-button">Save product</button></div>
+    </form>
+  </section>
+  <section class="panel"><div class="panel-head"><h2>Products & inventory</h2><input id="search" placeholder="Search products"></div><div id="products" class="products"></div></section>
+  <section class="panel"><h2>Recent orders</h2><div id="orders" class="orders"></div></section>
+</main><script src="/admin.js"></script></body></html>
