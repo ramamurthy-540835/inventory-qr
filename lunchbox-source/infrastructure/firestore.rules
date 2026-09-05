@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All application access goes through authenticated Cloud Run APIs.
+    // Browser SDK access is intentionally denied, including access by signed-in users.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

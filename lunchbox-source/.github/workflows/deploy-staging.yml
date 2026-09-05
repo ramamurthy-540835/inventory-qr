@@ -1,0 +1,39 @@
+name: Deploy staging
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: staging-deployment
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy Cloud Run staging
+        shell: bash
+        run: >-
+          gcloud run deploy "${{ vars.CLOUD_RUN_SERVICE }}"
+          --source .
+          --project "${{ vars.GCP_PROJECT_ID }}"
+          --region "${{ vars.GCP_REGION }}"
+          --service-account "${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }}"
+          --allow-unauthenticated
+          --set-env-vars "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }},FIREBASE_PROJECT_ID=${{ vars.GCP_PROJECT_ID }},BIGQUERY_DATASET=school_lunch,SCHOOL_DIRECTORY_BIGQUERY_DATASET=school_directory,BIGQUERY_LOCATION=asia-south1,BIGQUERY_ORDERS_TABLE=orders,GCS_BUCKET=${{ vars.GCS_BUCKET }},FIRESTORE_DATABASE_ID=(default),PAYMENT_HOLD_MINUTES=15,REQUIRE_FIREBASE_AUTH=false,ENABLE_PAYMENTS=false"
+          --set-secrets "PAYMENT_EXPIRY_TASK_SECRET=payment-expiry-task-secret:latest,SERP_API_KEY=serp-api-key:latest,GOOGLE_PLACES_API_KEY=google-places-api-key:latest,SCHOOL_DISCOVERY_TASK_SECRET=school-discovery-task-secret:latest"

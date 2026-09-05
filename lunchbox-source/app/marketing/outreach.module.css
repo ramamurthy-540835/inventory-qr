@@ -1,0 +1,140 @@
+.recipientSection {
+  border-top: 1px solid #edf0ed;
+  margin-top: 20px;
+  padding-top: 19px;
+}
+
+.pipelineFields { display: grid; gap: 7px; grid-template-columns: 1fr 1fr; }
+.pipelineFields label { display: grid; gap: 4px; }
+.pipelineFields label:first-child { grid-column: 1 / -1; }
+.pipelineFields label span { color: #68776f; font-size: 9px; font-weight: 700; }
+.pipelineFields input { min-width: 0; }
+
+.recipientSection > div:first-child h3 {
+  font-size: 15px;
+  margin: 0 0 4px;
+}
+
+.recipientSection > div:first-child p {
+  color: #718078;
+  font-size: 11px;
+  margin: 0;
+}
+
+.recipientList {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.recipientList article {
+  align-items: center;
+  border: 1px solid #dfe4e0;
+  border-radius: 9px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1.2fr 1fr auto;
+  padding: 12px;
+}
+
+.consents { display: flex; gap: 12px; grid-column: 1 / -1; }
+.consents label { align-items: center; color: #52635a; display: flex; font-size: 10px; gap: 5px; }
+.automationBar { align-items: center; display: flex; gap: 12px; margin-top: 14px; }
+.automationBar button { background: #173e30; border: 0; border-radius: 8px; color: #fff; cursor: pointer; font-weight: 700; padding: 10px 14px; }
+.automationBar button:disabled { opacity: .6; }
+.automationBar p { color: #52635a; font-size: 11px; margin: 0; }
+.sequenceControls { align-items: end; background: #f5f7f4; border-radius: 9px; display: grid; gap: 12px; grid-template-columns: 180px 180px 1fr 210px; margin-top: 14px; padding: 12px; }
+.sequenceControls label { display: grid; gap: 5px; }
+.sequenceControls label span { color: #68776f; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.sequenceControls select { background: #fff; border: 1px solid #ccd5cf; border-radius: 7px; height: 36px; padding: 0 9px; }
+.sequenceControls input[type="url"] { background: #fff; border: 1px solid #ccd5cf; border-radius: 7px; height: 36px; padding: 0 9px; width: 100%; }
+.sequenceControls .customImage { grid-column: 1 / -1; }
+.sequenceControls .responseToggle { align-items: center; display: flex; font-size: 10px; padding-bottom: 9px; }
+
+.messagePreviews { display: grid; gap: 12px; margin-top: 20px; }
+.messagePreviews > h3 { font-size: 15px; margin: 0; }
+.messagePreviews > article { align-items: start; background: #fafbf9; border: 1px solid #dfe4e0; border-radius: 10px; display: grid; gap: 16px; grid-template-columns: 210px 1fr; overflow: hidden; padding: 12px; }
+.messagePreviews img { aspect-ratio: 3 / 2; border-radius: 7px; object-fit: cover; width: 100%; }
+.previewContent { display: grid; gap: 10px; }
+.previewMeta { align-items: center; display: flex; flex-wrap: wrap; gap: 7px; }
+.previewMeta span { background: #f5eee1; border-radius: 12px; color: #9a4f30; font-size: 9px; font-weight: 700; padding: 4px 7px; text-transform: uppercase; }
+.previewMeta strong { font-size: 14px; margin-left: 3px; }
+.previewContent section { border-top: 1px solid #e7ebe8; padding-top: 9px; }
+.previewContent h4 { color: #68776f; font-size: 9px; letter-spacing: .8px; margin: 0 0 5px; text-transform: uppercase; }
+.previewContent p { color: #344b41; font-size: 11px; line-height: 1.55; margin: 0 0 9px; white-space: pre-line; }
+
+.recipientList small {
+  color: #b55b35;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.recipientList h4 {
+  font-size: 13px;
+  margin: 3px 0;
+}
+
+.recipientList p {
+  color: #718078;
+  font-size: 10px;
+  margin: 0;
+}
+
+.recipientList input {
+  background: #fafbf9;
+  border: 1px solid #ccd5cf;
+  border-radius: 8px;
+  color: #17382d;
+  height: 38px;
+  padding: 0 11px;
+  width: 100%;
+}
+
+.sendActions {
+  display: flex;
+  gap: 7px;
+}
+
+.sendActions a,
+.sendActions span {
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 10px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sendActions a {
+  background: #173e30;
+  color: #fff;
+}
+
+.sendActions span {
+  background: #edf0ed;
+  color: #89958e;
+}
+
+.recipientEmpty {
+  border: 1px dashed #c9d4cd;
+  border-radius: 9px;
+  color: #718078;
+  font-size: 11px;
+  margin-top: 14px;
+  padding: 18px;
+}
+
+@media (max-width: 1000px) {
+  .recipientList article {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .recipientList article {
+    grid-template-columns: 1fr;
+  }
+  .messagePreviews > article { grid-template-columns: 1fr; }
+  .sequenceControls { grid-template-columns: 1fr; }
+  .pipelineFields { grid-template-columns: 1fr; }
+}

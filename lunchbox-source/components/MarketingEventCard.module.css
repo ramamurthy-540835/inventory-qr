@@ -1,0 +1,27 @@
+.leadPill {
+  background: #eef3ef !important;
+  color: #18392c !important;
+  border: 1px solid #d5dfd8;
+}
+
+.actions {
+  display: flex;
+  gap: 7px;
+  margin-left: auto;
+}
+
+.actions button {
+  background: #fff;
+  border: 1px solid #b9c8be;
+  border-radius: 7px;
+  color: #18392c;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 5px 8px;
+}
+
+.actions button:last-child {
+  border-color: #e2b9b1;
+  color: #983f30;
+}

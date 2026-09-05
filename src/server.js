@@ -29,7 +29,8 @@ app.get('/generated-product-images/:id.png', async (req, res, next) => { try {
   res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=31536000, immutable' }).send(bytes);
 } catch (e) { if (e.code === 404) return fail(res, 404, 'Generated product image not found'); next(e); } });
 
-app.get('/', (req, res) => res.json({ service: 'inventory-management-api', status: 'ok', health: '/health' }));
+app.get('/', (req, res) => res.redirect(302, '/app/'));
+app.get(['/privacy-policy', '/terms-and-conditions', '/shipping-policy', '/refund-policy', '/contact-us'], (req, res) => res.redirect(302, `/app${req.path}`));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/register', (req, res) => res.sendFile(path.join(dirname, '..', 'public', 'register.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(dirname, '..', 'public', 'login.html')));

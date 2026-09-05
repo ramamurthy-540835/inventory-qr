@@ -5,9 +5,50 @@ import { payForCart } from './services/razorpay';
 import type { CartLine, Customer, Product } from './types/commerce';
 
 type Tab = 'home' | 'categories' | 'search' | 'orders' | 'account';
-const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+type LegalPage = 'privacy-policy' | 'terms-and-conditions' | 'shipping-policy' | 'refund-policy' | 'contact-us';
+// Prices are stored in rupees and may include paise.  Showing the paise keeps
+// the displayed line items and checkout total in agreement.
+const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const legalPages: Record<LegalPage, { title: string; sections: Array<{ heading: string; body: string }> }> = {
+  'privacy-policy': { title: 'Privacy Policy', sections: [
+    { heading: 'Information we collect', body: 'We collect the account, contact, delivery-address, order and payment-confirmation information needed to provide grocery ordering and delivery services. Payment card and UPI details are handled by Razorpay; Nelture does not store them.' },
+    { heading: 'How we use information', body: 'We use your information to process orders, deliver purchases, provide customer support, prevent fraud and meet legal obligations. We do not sell personal information.' },
+    { heading: 'Sharing and security', body: 'Information is shared only with service providers required to operate the service, including payment and delivery providers, or where required by law. We use reasonable safeguards to protect information.' },
+    { heading: 'Your choices', body: 'You may ask to review, correct or delete your account information by contacting Nelture support, subject to legal record-keeping requirements.' },
+  ] },
+  'terms-and-conditions': { title: 'Terms and Conditions', sections: [
+    { heading: 'Using Nelture', body: 'By using Nelture, you agree to provide accurate account and delivery information and to use the service only for lawful personal purchases.' },
+    { heading: 'Products, prices and availability', body: 'Product availability, prices, delivery coverage and delivery charges may change. The final amount and applicable charges are shown before you complete payment.' },
+    { heading: 'Orders and payments', body: 'An order is confirmed after successful payment and our acceptance of the order. Payments are processed securely by Razorpay using the payment method you choose.' },
+    { heading: 'Changes to these terms', body: 'We may update these terms when the service changes. Continued use after an update means you accept the revised terms.' },
+  ] },
+  'shipping-policy': { title: 'Shipping and Delivery Policy', sections: [
+    { heading: 'Delivery coverage', body: 'Nelture delivers only to serviceable locations shown during checkout. Please provide a complete, accurate delivery address and PIN code.' },
+    { heading: 'Delivery charges and timing', body: 'Any delivery charge and the expected delivery schedule are shown at checkout before payment. Delivery times may vary because of product availability, weather, traffic and other operational conditions.' },
+    { heading: 'Delivery of your order', body: 'Please be available to receive the order at the provided address. If an item is unavailable, Nelture may contact you about a substitute, partial fulfilment or refund.' },
+  ] },
+  'refund-policy': { title: 'Cancellation and Refund Policy', sections: [
+    { heading: 'Cancellation', body: 'You may request cancellation before an order has been processed or dispatched. Contact support with your order details as soon as possible.' },
+    { heading: 'Damaged, incorrect or missing items', body: 'If an item is damaged, incorrect or missing, contact Nelture support promptly with your order details and photographs where relevant. We will review the request and provide an appropriate replacement, credit or refund when eligible.' },
+    { heading: 'Refund timing', body: 'Approved refunds are returned to the original payment method. The time taken for the credit to appear depends on your bank, card issuer or UPI provider.' },
+    { heading: 'Non-returnable items', body: 'Perishable, opened or used products may not be eligible for return unless they were delivered damaged, incorrect or defective.' },
+  ] },
+  'contact-us': { title: 'Contact Us', sections: [
+    { heading: 'Customer support', body: 'For help with an order, payment, delivery, cancellation or refund, email support@nelture.ai and include your name, registered mobile number and order details.' },
+    { heading: 'Business name', body: 'Nelture.ai grocery service.' },
+    { heading: 'Support hours', body: 'Our support team responds as soon as possible during normal business hours.' },
+  ] },
+};
+
+function currentLegalPage(): LegalPage | null {
+  const segment = window.location.pathname.replace(/^\/app\/?/, '').replace(/\/$/, '') as LegalPage;
+  return segment in legalPages ? segment : null;
+}
 
 function App() {
+  const legalPage = currentLegalPage();
+  if (legalPage) return <LegalPageView page={legalPage} />;
   const [tab, setTab] = useState<Tab>('home');
   const [query, setQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
@@ -36,7 +77,7 @@ function App() {
         <label className="ml-auto flex h-11 min-w-0 max-w-xl flex-1 items-center gap-2 rounded-xl bg-[#f4f7f2] px-3 focus-within:ring-2 focus-within:ring-nelture-500"><Search size={19} className="text-slate-500" /><input value={query} onFocus={() => setTab('search')} onChange={e => { setQuery(e.target.value); setTab('search'); }} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Search groceries, brands and more" /></label>
         {customer ? <div className="hidden items-center gap-1 sm:flex"><button onClick={() => setTab('account')} className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-nelture-700 hover:bg-nelture-50"><UserRound size={18}/><span className="max-w-24 truncate">Hi, {customer.customer_name.split(' ')[0]}</span></button><button onClick={logout} className="rounded-xl border border-nelture-600 px-3 py-2 text-xs font-bold text-nelture-700">Logout</button></div> : <a href="/register" className="hidden rounded-xl bg-nelture-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-nelture-700 sm:inline-flex">Sign in / Register</a>}
         <button aria-label="Notifications" className="grid h-10 w-10 place-items-center rounded-xl hover:bg-nelture-50"><Bell size={20}/></button>
-        <button onClick={() => setTab('orders')} className="relative grid h-10 w-10 place-items-center rounded-xl bg-nelture-600 text-white"><ShoppingCart size={20}/>{cart.length > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#f59f2f] px-1 text-[10px] font-bold">{cart.length}</span>}</button>
+        <button onClick={() => setTab('orders')} className="relative grid h-10 w-10 place-items-center rounded-xl bg-nelture-600 text-white"><ShoppingCart size={20}/>{cart.length > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#f59f2f] px-1 text-[10px] font-bold">{cart.reduce((count, line) => count + line.quantity, 0)}</span>}</button>
       </div>
     </header>
     <main className="mx-auto max-w-7xl px-4 py-5 md:px-8">
@@ -47,8 +88,14 @@ function App() {
       {tab === 'account' && <Account customer={customer} />}
     </main>
     {locationOpen && customer && <LocationPicker customer={customer} onClose={() => setLocationOpen(false)} onSaved={saveLocation} />}
+    <footer className="mx-auto mt-10 max-w-7xl border-t border-[#dce7d8] px-4 py-7 text-xs text-slate-600 md:px-8"><p className="font-bold text-nelture-700">Nelture.ai</p><div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">{(Object.keys(legalPages) as LegalPage[]).map(page => <a key={page} href={`/app/${page}`} className="underline decoration-slate-300 underline-offset-2 hover:text-nelture-700">{legalPages[page].title}</a>)}</div></footer>
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e6ece2] bg-white px-2 py-2 md:hidden"><div className="mx-auto flex max-w-lg justify-around">{([{ id: 'home', label: 'Home', icon: Home }, { id: 'categories', label: 'Categories', icon: PackageOpen }, { id: 'search', label: 'Search', icon: Search }, { id: 'orders', label: 'Cart', icon: ShoppingBag }, { id: 'account', label: 'Account', icon: UserRound }] as const).map(item => <button key={item.id} onClick={() => setTab(item.id)} className={`grid min-w-14 place-items-center gap-1 text-[10px] font-semibold ${tab === item.id ? 'text-nelture-600' : 'text-slate-500'}`}><item.icon size={20}/>{item.label}</button>)}</div></nav>
   </div>;
+}
+
+function LegalPageView({ page }: { page: LegalPage }) {
+  const content = legalPages[page];
+  return <div className="min-h-screen bg-[#f7faf6] px-4 py-8 text-[#18251d] md:px-8"><main className="mx-auto max-w-3xl rounded-3xl bg-white p-6 shadow-sm md:p-10"><a href="/app/" className="text-sm font-bold text-nelture-700">← Back to Nelture.ai</a><p className="mt-7 text-xs font-bold uppercase tracking-[.16em] text-nelture-600">Nelture.ai grocery service</p><h1 className="mt-2 text-3xl font-black tracking-tight">{content.title}</h1><p className="mt-2 text-sm text-slate-500">Last updated: 3 September 2026</p><div className="mt-8 space-y-7">{content.sections.map(section => <section key={section.heading}><h2 className="text-lg font-black">{section.heading}</h2><p className="mt-2 text-sm leading-6 text-slate-700">{section.body}</p></section>)}</div></main></div>;
 }
 
 function HomePage({ products, loading, error, onAdd, onBrowse }: { products: Product[]; loading: boolean; error: string; onAdd: (p: Product) => void; onBrowse: () => void }) {

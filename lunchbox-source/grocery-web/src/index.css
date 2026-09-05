@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  --color-nelture-50: #f6fbf2;
+  --color-nelture-100: #e8f5df;
+  --color-nelture-500: #278a4e;
+  --color-nelture-600: #167a45;
+  --color-nelture-700: #0f6035;
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+:root { color: #18251d; background: #f7faf6; font-synthesis: none; text-rendering: optimizeLegibility; }
+body { margin: 0; min-width: 320px; }
+button, input { font: inherit; }

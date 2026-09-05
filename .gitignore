@@ -5,5 +5,8 @@ node_modules/
 *.log
 coverage/
 .DS_Store
+*.tgz
+lunchbox-source/.next/
+lunchbox-source/grocery-web/dist/
 rzp-key.csv
 razorpay-webhook-secret.txt
