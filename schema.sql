@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS `customer-grocery-507211.inventory_management.product
   category_id STRING,
   image_url STRING,
   active BOOL,
+  price_history ARRAY<STRUCT<rate_id STRING, price NUMERIC, mrp NUMERIC, recorded_at TIMESTAMP, source STRING>>,
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NOT NULL
 )
