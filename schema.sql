@@ -69,6 +69,33 @@ CREATE TABLE IF NOT EXISTS `customer-grocery-507211.inventory_management.orders`
 PARTITION BY DATE(order_date)
 CLUSTER BY customer_id, order_status;
 
+CREATE TABLE IF NOT EXISTS `customer-grocery-507211.inventory_management.products` (
+  product_id STRING NOT NULL,
+  name STRING NOT NULL,
+  brand STRING,
+  unit STRING,
+  price NUMERIC,
+  mrp NUMERIC,
+  stock INT64,
+  category_id STRING,
+  image_url STRING,
+  active BOOL,
+  created_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL
+)
+CLUSTER BY category_id, active, name;
+
+CREATE TABLE IF NOT EXISTS `customer-grocery-507211.inventory_management.product_price_history` (
+  rate_id STRING NOT NULL,
+  product_id STRING NOT NULL,
+  price NUMERIC NOT NULL,
+  mrp NUMERIC,
+  recorded_at TIMESTAMP NOT NULL,
+  source STRING NOT NULL
+)
+PARTITION BY DATE(recorded_at)
+CLUSTER BY product_id;
+
 -- Useful BigQuery queries
 -- Customer orders: SELECT * FROM `customer-grocery-507211.inventory_management.orders` WHERE customer_id = @customer_id ORDER BY order_date DESC;
 -- Available inventory: SELECT * FROM `customer-grocery-507211.inventory_management.inventory_stock` WHERE status = 'AVAILABLE' ORDER BY expiry_date;

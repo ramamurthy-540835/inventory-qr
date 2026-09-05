@@ -131,6 +131,29 @@ const unitOk = value => ['KG', 'GRAM', 'LITRE', 'PIECE'].includes(value);
 const statusOk = (value, choices) => choices.includes(value);
 async function rows(query, params = {}) { return (await bq.query({ query, params, location: 'asia-south1' }))[0]; }
 async function insert(name, row) { await bq.dataset(datasetId).table(name).insert([row]); return row; }
+function productRow(productId, product) {
+  const timestamp = now();
+  return { product_id: productId, name: String(product.name || ''), brand: String(product.brand || 'Nelture'), unit: String(product.unit || ''), price: Number(product.price || 0), mrp: Number(product.mrp ?? product.price ?? 0), stock: Number(product.stock || 0), category_id: String(product.categoryId || ''), image_url: String(product.imageUrl || ''), active: product.active !== false, created_at: product.createdAt?.toDate ? product.createdAt.toDate().toISOString() : (product.createdAt || timestamp), updated_at: product.updatedAt?.toDate ? product.updatedAt.toDate().toISOString() : timestamp };
+}
+async function syncProductCsv() {
+  const products = await rows(`SELECT product_id, name, brand, unit, price, mrp, stock, category_id, image_url, active, created_at, updated_at FROM ${table('products')} ORDER BY name`);
+  const fields = ['product_id','name','brand','unit','price','mrp','stock','category_id','image_url','active','created_at','updated_at'];
+  const csvCell = value => { const text = value == null ? '' : String(value); return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; };
+  const csv = [fields.join(','), ...products.map(product => fields.map(field => csvCell(product[field])).join(','))].join('\n') + '\n';
+  await storage.bucket(bucketName).file('products/products.csv').save(Buffer.from(csv), { resumable: false, contentType: 'text/csv', metadata: { cacheControl: 'no-cache' } });
+  const history = await rows(`SELECT rate_id, product_id, price, mrp, recorded_at, source FROM ${table('product_price_history')} ORDER BY recorded_at, product_id`);
+  const historyFields = ['rate_id','product_id','price','mrp','recorded_at','source'];
+  const historyCsv = [historyFields.join(','), ...history.map(item => historyFields.map(field => csvCell(item[field])).join(','))].join('\n') + '\n';
+  await storage.bucket(bucketName).file('products/product-rate-history.csv').save(Buffer.from(historyCsv), { resumable: false, contentType: 'text/csv', metadata: { cacheControl: 'no-cache' } });
+}
+async function mirrorProduct(productId, product) {
+  const row = productRow(productId, product);
+  const previous = (await rows(`SELECT price, mrp FROM ${table('products')} WHERE product_id=@product_id LIMIT 1`, { product_id: productId }))[0];
+  await rows(`MERGE ${table('products')} T USING (SELECT @product_id product_id, @name name, @brand brand, @unit unit, CAST(@price AS NUMERIC) price, CAST(@mrp AS NUMERIC) mrp, CAST(@stock AS INT64) stock, @category_id category_id, @image_url image_url, @active active, CAST(@created_at AS TIMESTAMP) created_at, CAST(@updated_at AS TIMESTAMP) updated_at) S ON T.product_id=S.product_id WHEN MATCHED THEN UPDATE SET name=S.name, brand=S.brand, unit=S.unit, price=S.price, mrp=S.mrp, stock=S.stock, category_id=S.category_id, image_url=S.image_url, active=S.active, updated_at=S.updated_at WHEN NOT MATCHED THEN INSERT (product_id,name,brand,unit,price,mrp,stock,category_id,image_url,active,created_at,updated_at) VALUES (S.product_id,S.name,S.brand,S.unit,S.price,S.mrp,S.stock,S.category_id,S.image_url,S.active,S.created_at,S.updated_at)`, row);
+  if (!previous || Number(previous.price) !== row.price || Number(previous.mrp) !== row.mrp) await rows(`INSERT INTO ${table('product_price_history')} (rate_id, product_id, price, mrp, recorded_at, source) VALUES (@rate_id, @product_id, CAST(@price AS NUMERIC), CAST(@mrp AS NUMERIC), CURRENT_TIMESTAMP(), @source)`, { rate_id: id('RATE'), product_id: productId, price: row.price, mrp: row.mrp, source: 'admin' });
+  await syncProductCsv();
+}
+async function removeMirroredProduct(productId) { await rows(`DELETE FROM ${table('products')} WHERE product_id=@product_id`, { product_id: productId }); await syncProductCsv(); }
 function readCookie(req, name) { return (req.headers.cookie || '').split(';').map(item => item.trim().split('=')).find(([key]) => key === name)?.[1]; }
 async function startSession(res, customer) {
   const token = crypto.randomBytes(32).toString('base64url'); const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14);
@@ -208,6 +231,7 @@ app.post('/admin/auth/login', async (req, res, next) => { try { const supplied =
 app.post('/admin/auth/logout', async (req, res, next) => { try { const token = readCookie(req, 'nelture_admin'); if (token) await firestore.collection('admin_sessions').doc(token).delete(); res.clearCookie('nelture_admin', { httpOnly: true, secure: true, sameSite: 'lax', path: '/' }); res.sendStatus(204); } catch (e) { next(e); } });
 app.get('/admin/api/dashboard', async (req, res, next) => { try { if (!await requireAdmin(req)) return fail(res, 403, 'Admin access required'); const [customerRows, orderRows, products] = await Promise.all([rows(`SELECT COUNT(*) AS count FROM ${table('customers')}`), rows(`SELECT COUNT(*) AS count, COALESCE(SUM(total_amount),0) AS sales FROM ${table('orders')}`), firestore.collection('products').get()]); const inventory = products.docs.map(doc => doc.data()); res.json({ customers: Number(customerRows[0].count), orders: Number(orderRows[0].count), sales: Number(orderRows[0].sales), products: inventory.length, lowStock: inventory.filter(product => Number(product.stock || 0) <= 10).length }); } catch (e) { next(e); } });
 app.get('/admin/api/products', async (req, res, next) => { try { if (!await requireAdmin(req)) return fail(res, 403, 'Admin access required'); const snapshot = await firestore.collection('products').orderBy('name').get(); res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); } catch (e) { next(e); } });
+app.post('/admin/api/products/sync', async (req, res, next) => { try { if (!await requireAdmin(req)) return fail(res, 403, 'Admin access required'); const snapshot = await firestore.collection('products').get(); for (const doc of snapshot.docs) await mirrorProduct(doc.id, { id: doc.id, ...doc.data() }); res.json({ synced: snapshot.size, csv: `gs://${bucketName}/products/products.csv` }); } catch (e) { next(e); } });
 app.post('/admin/api/products', async (req, res, next) => { try {
   if (!await requireAdmin(req)) return fail(res, 403, 'Admin access required');
   const name = String(req.body.name || '').trim(); const unit = String(req.body.unit || '').trim(); const brand = String(req.body.brand || 'Nelture').trim();
@@ -219,13 +243,14 @@ app.post('/admin/api/products', async (req, res, next) => { try {
   const imageUrl = await generateProductImage(productId, name, unit, inferred.categoryId);
   const product = { name, brand: brand || 'Nelture', unit, price, mrp, stock, active: true, ...inferred, imageUrl, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
   await firestore.collection('products').doc(productId).set(product);
+  await mirrorProduct(productId, { ...product, createdAt: now(), updatedAt: now() });
   res.status(201).json({ id: productId, ...product, createdAt: now(), updatedAt: now() });
 } catch (e) { next(e); } });
 app.post('/admin/api/products/:id/generate-image', async (req, res, next) => { try {
   if (!await requireAdmin(req)) return fail(res, 403, 'Admin access required');
   const ref = firestore.collection('products').doc(req.params.id); const snapshot = await ref.get(); if (!snapshot.exists) return fail(res, 404, 'Product not found');
   const product = snapshot.data(); const inferred = inferProductDetails(product.name); const imageUrl = await generateProductImage(req.params.id, product.name, product.unit, inferred.categoryId);
-  await ref.update({ ...inferred, imageUrl, updatedAt: FieldValue.serverTimestamp() }); res.json({ id: req.params.id, imageUrl });
+  await ref.update({ ...inferred, imageUrl, updatedAt: FieldValue.serverTimestamp() }); await mirrorProduct(req.params.id, { ...product, ...inferred, imageUrl, updatedAt: now() }); res.json({ id: req.params.id, imageUrl });
 } catch (e) { next(e); } });
 app.patch('/admin/api/products/:id', async (req, res, next) => { try {
   if (!await requireAdmin(req)) return fail(res, 403, 'Admin access required');
@@ -236,9 +261,9 @@ app.patch('/admin/api/products/:id', async (req, res, next) => { try {
   if ('brand' in changes) changes.brand = String(changes.brand).trim() || 'Nelture'; if ('unit' in changes) { changes.unit = String(changes.unit).trim(); if (!changes.unit) return fail(res, 400, 'Unit is required'); }
   for (const field of ['price', 'mrp', 'stock']) if (field in changes) changes[field] = Number(changes[field]);
   if (('price' in changes && (!Number.isFinite(changes.price) || changes.price < 0)) || ('mrp' in changes && (!Number.isFinite(changes.mrp) || changes.mrp < 0)) || ('stock' in changes && (!Number.isInteger(changes.stock) || changes.stock < 0))) return fail(res, 400, 'Price and MRP must be valid, and stock must be a whole number');
-  await ref.update({ ...changes, updatedAt: FieldValue.serverTimestamp() }); res.sendStatus(204);
+  await ref.update({ ...changes, updatedAt: FieldValue.serverTimestamp() }); const latest = (await ref.get()).data(); await mirrorProduct(req.params.id, { ...latest, ...changes, updatedAt: now() }); res.sendStatus(204);
 } catch (e) { next(e); } });
-app.delete('/admin/api/products/:id', async (req, res, next) => { try { if (!await requireAdmin(req)) return fail(res, 403, 'Admin access required'); const ref = firestore.collection('products').doc(req.params.id); if (!(await ref.get()).exists) return fail(res, 404, 'Product not found'); await ref.delete(); res.sendStatus(204); } catch (e) { next(e); } });
+app.delete('/admin/api/products/:id', async (req, res, next) => { try { if (!await requireAdmin(req)) return fail(res, 403, 'Admin access required'); const ref = firestore.collection('products').doc(req.params.id); if (!(await ref.get()).exists) return fail(res, 404, 'Product not found'); await ref.delete(); await removeMirroredProduct(req.params.id); res.sendStatus(204); } catch (e) { next(e); } });
 app.get('/admin/api/orders', async (req, res, next) => { try { if (!await requireAdmin(req)) return fail(res, 403, 'Admin access required'); res.json(await rows(`SELECT order_id, customer_name, product_name, quantity, total_amount, order_status, payment_status, order_date FROM ${table('orders')} ORDER BY order_date DESC LIMIT 100`)); } catch (e) { next(e); } });
 app.patch('/customers/:id', async (req, res, next) => { try {
   const editable = ['customer_name', 'phone_number', 'email', 'address', 'postal_code', 'city', 'state'];

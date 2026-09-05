@@ -11,7 +11,13 @@ const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: process.cwd(),
   async rewrites() {
-    return [{ source: "/grocery-api/:path*", destination: "https://nelture-grocery-foovqasysa-el.a.run.app/:path*" }];
+    return {
+      beforeFiles: [
+        { source: "/grocery", destination: "/grocery-app/index.html" },
+        { source: "/grocery/", destination: "/grocery-app/index.html" },
+        { source: "/grocery-api/:path*", destination: "https://nelture-grocery-624683933018.asia-south1.run.app/:path*" },
+      ],
+    };
   },
 };
 
