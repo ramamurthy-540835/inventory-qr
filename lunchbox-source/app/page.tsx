@@ -80,6 +80,7 @@ export default function Home() {
           <span>Lunch<span>Box</span></span>
         </a>
         <nav aria-label="Primary navigation">
+          <a href="/grocery-app/index.html">Grocery</a>
           <a href="#menu">Menu</a>
           <a href="#standards">Our promise</a>
           <a href="#how">How it works</a>
