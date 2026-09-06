@@ -1,7 +1,7 @@
 import type { Category, Customer, Product } from '../types/commerce';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? '';
-const endpoint = (path: string) => `${apiBase}${path}`;
+export const endpoint = (path: string) => `${apiBase}${path}`;
 
 export async function registerCustomer(payload: Omit<Customer, 'customer_id'>): Promise<Customer> {
   const response = await fetch(endpoint('/customers'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });

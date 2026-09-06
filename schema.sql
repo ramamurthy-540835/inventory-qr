@@ -69,6 +69,16 @@ CREATE TABLE IF NOT EXISTS `customer-grocery-507211.inventory_management.orders`
 PARTITION BY DATE(order_date)
 CLUSTER BY customer_id, order_status;
 
+CREATE TABLE IF NOT EXISTS `customer-grocery-507211.inventory_management.customer_carts` (
+  customer_id STRING NOT NULL,
+  items_json STRING NOT NULL,
+  item_count INT64 NOT NULL,
+  total_amount NUMERIC NOT NULL,
+  updated_at TIMESTAMP NOT NULL
+)
+PARTITION BY DATE(updated_at)
+CLUSTER BY customer_id;
+
 CREATE TABLE IF NOT EXISTS `customer-grocery-507211.inventory_management.products` (
   product_id STRING NOT NULL,
   name STRING NOT NULL,

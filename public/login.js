@@ -9,7 +9,6 @@ form.addEventListener('submit', async event => {
   const button = form.querySelector('button'); button.disabled = true; button.querySelector('span').textContent = 'Signing in…';
   try {
     const response = await fetch('/customers/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login }) });
-    const customer = await response.json(); if (!response.ok) throw new Error(customer.error || 'Unable to sign in.');
-    localStorage.setItem('nelture-customer', JSON.stringify(customer)); window.location.assign('/app/');
+    const customer = await response.json(); if (!response.ok) throw new Error(customer.error || 'Unable to sign in.'); window.location.assign('/app/');
   } catch (error) { message.textContent = error.message; message.classList.add('error'); button.disabled = false; button.querySelector('span').textContent = 'Sign in to account'; }
 });

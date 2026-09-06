@@ -1,0 +1,3 @@
+.registration-hero-art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;opacity:.9;z-index:0}
+.brand-panel:before,.brand-panel:after{z-index:0}
+.brand,.intro,.benefits,.panel-footer{z-index:1;text-shadow:0 1px 12px rgba(0,0,0,.25)}

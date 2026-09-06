@@ -25,7 +25,6 @@ form.addEventListener('submit', async event => {
   try {
     const response = await fetch('/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const body = await response.json(); if (!response.ok) throw new Error(body.error || 'Unable to create your account.');
-    localStorage.setItem('nelture-customer', JSON.stringify(body));
     form.reset(); message.textContent = `Welcome to Nelture! Your customer ID is ${body.customer_id}. Opening your grocery account…`; message.classList.add('success');
     window.setTimeout(() => window.location.assign('/app/'), 900);
   } catch (err) { message.textContent = err.message; message.classList.add('error'); }

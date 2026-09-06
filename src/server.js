@@ -38,20 +38,22 @@ app.get('/admin', async (req, res, next) => { try { if (!await requireAdmin(req)
 app.get('/admin/login', (req, res) => res.sendFile(path.join(dirname, '..', 'public', 'admin-login.html')));
 app.get(['/app', '/app/*'], (req, res) => res.sendFile(path.join(dirname, '..', 'public', 'app', 'index.html')));
 app.get('/api/catalog', async (req, res, next) => { try {
-  const [categorySnapshot, productSnapshot] = await Promise.all([
+  const [categorySnapshot, productSnapshot, inventoryByName] = await Promise.all([
     firestore.collection('categories').where('active', '==', true).limit(100).get(),
     firestore.collection('products').where('active', '==', true).limit(100).get(),
+    inventoryStockByName(),
   ]);
   res.json({
     categories: categorySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
-    products: productSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+    products: productSnapshot.docs.map(doc => applyInventoryStock({ id: doc.id, ...doc.data() }, inventoryByName)),
   });
 } catch (e) { next(e); } });
 app.get('/payments/config', (req, res) => res.json({ keyId: process.env.RAZORPAY_KEY_ID || '' }));
 app.post('/payments/order', async (req, res, next) => { try {
   const customer = await currentSessionCustomer(req); if (!customer) return fail(res, 401, 'Please sign in before payment');
   const items = Array.isArray(req.body.items) ? req.body.items : []; if (!items.length) return fail(res, 400, 'Cart is empty');
-  let amount = 0; for (const item of items) { const snap = await firestore.collection('products').doc(String(item.productId)).get(); const product = snap.data(); if (!product?.active || Number(product.stock) < Number(item.quantity)) return fail(res, 409, 'A cart product is unavailable'); amount += Math.round(Number(product.price) * Number(item.quantity) * 100); }
+  const inventoryByName = await inventoryStockByName();
+  let amount = 0; for (const item of items) { const snap = await firestore.collection('products').doc(String(item.productId)).get(); const product = snap.exists ? applyInventoryStock(snap.data(), inventoryByName) : null; if (!product?.active || Number(product.stock) < Number(item.quantity)) return fail(res, 409, 'A cart product is unavailable'); amount += Math.round(Number(product.price) * Number(item.quantity) * 100); }
   const auth = Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString('base64'); const receipt = `nel_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
   const razorpay = await fetch('https://api.razorpay.com/v1/orders', { method: 'POST', headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, currency: 'INR', receipt }) }); const order = await razorpay.json(); if (!razorpay.ok) return fail(res, 502, order.error?.description || 'Unable to create Razorpay order');
   res.status(201).json({ id: order.id, amount: order.amount, currency: order.currency, customer: { name: customer.customer_name, email: customer.email, contact: customer.phone_number } });
@@ -61,6 +63,51 @@ app.post('/payments/verify', async (req, res, next) => { try { const expected = 
 const table = name => `\`${projectId}.${datasetId}.${name}\``;
 const now = () => new Date().toISOString();
 const id = prefix => `${prefix}-${crypto.randomUUID()}`;
+const productKey = value => String(value || '').toLowerCase().split('/')[0].replace(/[^a-z0-9]/g, '');
+function packageUnit(quantity, unit) {
+  const amount = Number(quantity);
+  const label = ({ KG: 'kg', GRAM: 'g', LITRE: 'litre', PIECE: 'piece' })[String(unit || '').toUpperCase()] || String(unit || '').toLowerCase();
+  if (!Number.isFinite(amount) || !label) return String(unit || '');
+  const formatted = Number.isInteger(amount) ? String(amount) : String(amount).replace(/\.?0+$/, '');
+  return `${formatted} ${label}`;
+}
+async function inventoryStockByName() {
+  const inventoryRows = await rows(`SELECT material_name, category, quantity, unit, price, status FROM ${table('inventory_stock')} WHERE status != 'OUT_OF_STOCK'`);
+  return new Map(inventoryRows.map(item => [productKey(item.material_name), item]));
+}
+function applyInventoryStock(product, inventoryByName) {
+  const stock = inventoryByName.get(productKey(product.name));
+  return stock ? { ...product, price: Number(stock.price), stock: Number(product.stock || 100), unit: packageUnit(stock.quantity, stock.unit) || product.unit, categoryId: stock.category || product.categoryId } : product;
+}
+function normalizeCartItems(items) {
+  return items.map(item => ({
+    id: String(item.id || ''),
+    name: String(item.name || ''),
+    brand: String(item.brand || 'Nelture'),
+    categoryId: String(item.categoryId || ''),
+    imageUrl: String(item.imageUrl || ''),
+    mrp: Number(item.mrp ?? item.price ?? 0),
+    price: Number(item.price || 0),
+    unit: String(item.unit || ''),
+    stock: Number(item.stock || 0),
+    quantity: Number(item.quantity),
+  }));
+}
+async function cartItemsFromBigQuery(customerId) {
+  const [cart] = await rows(`SELECT items_json FROM ${table('customer_carts')} WHERE customer_id=@customer_id ORDER BY updated_at DESC LIMIT 1`, { customer_id: customerId });
+  if (!cart?.items_json) return [];
+  try { const parsed = JSON.parse(cart.items_json); return Array.isArray(parsed) ? normalizeCartItems(parsed) : []; }
+  catch { return []; }
+}
+async function saveCartSnapshot(customerId, items) {
+  await insert('customer_carts', {
+    customer_id: customerId,
+    items_json: JSON.stringify(items),
+    item_count: items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+    total_amount: items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0),
+    updated_at: now(),
+  });
+}
 const customerId = name => {
   const letters = String(name).replace(/[^a-z]/gi, '').slice(0, 4).toUpperCase().padEnd(4, 'X');
   return `${letters}${crypto.randomInt(100, 1000)}`;
@@ -228,6 +275,20 @@ app.post('/auth/location', async (req, res, next) => { try {
   res.json({ ...customer, address: String(address).trim(), postal_code: String(postal_code), city: String(city).trim(), state: String(state).trim() });
 } catch (e) { next(e); } });
 app.post('/auth/logout', async (req, res, next) => { try { const token = readCookie(req, 'nelture_session'); if (token) await firestore.collection('sessions').doc(token).delete(); res.clearCookie('nelture_session', { httpOnly: true, secure: true, sameSite: 'lax', path: '/' }); res.sendStatus(204); } catch (e) { next(e); } });
+app.get('/cart', async (req, res, next) => { try {
+  const customer = await currentSessionCustomer(req); if (!customer) return fail(res, 401, 'Please sign in to access your cart');
+  const snapshot = await firestore.collection('carts').doc(customer.customer_id).get();
+  if (snapshot.exists && Array.isArray(snapshot.data().items)) return res.json({ items: snapshot.data().items });
+  res.json({ items: await cartItemsFromBigQuery(customer.customer_id) });
+} catch (e) { next(e); } });
+app.put('/cart', async (req, res, next) => { try {
+  const customer = await currentSessionCustomer(req); if (!customer) return fail(res, 401, 'Please sign in to save your cart');
+  const items = Array.isArray(req.body.items) ? normalizeCartItems(req.body.items) : [];
+  if (items.some(item => !item.id || !Number.isInteger(item.quantity) || item.quantity < 1 || !Number.isFinite(item.price))) return fail(res, 400, 'Cart contains an invalid item');
+  await firestore.collection('carts').doc(customer.customer_id).set({ items, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  await saveCartSnapshot(customer.customer_id, items);
+  res.json({ items });
+} catch (e) { next(e); } });
 app.post('/admin/auth/login', async (req, res, next) => { try { const supplied = Buffer.from(String(req.body.password || '')); const expected = Buffer.from(process.env.ADMIN_PASSWORD || ''); if (!expected.length || supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) return fail(res, 401, 'Incorrect admin password'); const token = crypto.randomBytes(32).toString('base64url'); const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 8); await firestore.collection('admin_sessions').doc(token).set({ expiresAt, createdAt: FieldValue.serverTimestamp() }); res.cookie('nelture_admin', token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 1000 * 60 * 60 * 8, path: '/' }); res.sendStatus(204); } catch (e) { next(e); } });
 app.post('/admin/auth/logout', async (req, res, next) => { try { const token = readCookie(req, 'nelture_admin'); if (token) await firestore.collection('admin_sessions').doc(token).delete(); res.clearCookie('nelture_admin', { httpOnly: true, secure: true, sameSite: 'lax', path: '/' }); res.sendStatus(204); } catch (e) { next(e); } });
 app.get('/admin/api/dashboard', async (req, res, next) => { try { if (!await requireAdmin(req)) return fail(res, 403, 'Admin access required'); const [customerRows, orderRows, products] = await Promise.all([rows(`SELECT COUNT(*) AS count FROM ${table('customers')}`), rows(`SELECT COUNT(*) AS count, COALESCE(SUM(total_amount),0) AS sales FROM ${table('orders')}`), firestore.collection('products').get()]); const inventory = products.docs.map(doc => doc.data()); res.json({ customers: Number(customerRows[0].count), orders: Number(orderRows[0].count), sales: Number(orderRows[0].sales), products: inventory.length, lowStock: inventory.filter(product => Number(product.stock || 0) <= 10).length }); } catch (e) { next(e); } });
@@ -297,13 +358,15 @@ app.post('/checkout', async (req, res, next) => { try {
   const requested = items.map(item => ({ productId: String(item.productId || ''), quantity: Number(item.quantity) })).filter(item => item.productId && Number.isInteger(item.quantity) && item.quantity > 0);
   if (requested.length !== items.length) return fail(res, 400, 'Cart contains an invalid item quantity');
   const products = new Map();
+  const inventoryByName = await inventoryStockByName();
   await firestore.runTransaction(async transaction => {
     for (const item of requested) {
       const ref = firestore.collection('products').doc(item.productId); const snap = await transaction.get(ref); const product = snap.data();
-      if (!snap.exists || !product?.active) throw Object.assign(new Error('A cart product is no longer available'), { status: 409 });
-      if (Number(product.stock || 0) < item.quantity) throw Object.assign(new Error(`${product.name} does not have enough stock`), { status: 409 });
-      products.set(item.productId, { ...product, id: snap.id });
-      transaction.update(ref, { stock: Number(product.stock) - item.quantity, updatedAt: FieldValue.serverTimestamp() });
+      const liveProduct = snap.exists ? applyInventoryStock(product, inventoryByName) : null;
+      if (!liveProduct?.active) throw Object.assign(new Error('A cart product is no longer available'), { status: 409 });
+      if (Number(liveProduct.stock || 0) < item.quantity) throw Object.assign(new Error(`${liveProduct.name} does not have enough stock`), { status: 409 });
+      products.set(item.productId, { ...liveProduct, id: snap.id });
+      transaction.update(ref, { stock: Number(liveProduct.stock) - item.quantity, price: Number(liveProduct.price), unit: liveProduct.unit, updatedAt: FieldValue.serverTimestamp() });
     }
   });
   const placed = [];
@@ -326,7 +389,7 @@ app.patch('/orders/:id/status', async (req, res, next) => { try {
   await rows(`UPDATE ${table('orders')} SET order_status=@status, updated_at=CURRENT_TIMESTAMP() WHERE order_id=@id`, { status: req.body.order_status, id: req.params.id }); res.sendStatus(204);
 } catch (e) { next(e); } });
 app.post('/exports/:tableName', async (req, res, next) => { try {
-  const allowed = ['materials','inventory_stock','customers','orders']; if (!allowed.includes(req.params.tableName)) return fail(res, 400, 'Invalid export table');
+  const allowed = ['materials','inventory_stock','customers','orders','customer_carts']; if (!allowed.includes(req.params.tableName)) return fail(res, 400, 'Invalid export table');
   const suffix = Date.now(); const staging = bq.dataset(datasetId).table(`export_${req.params.tableName}_${suffix}`);
   const destinationUri = `gs://${bucketName}/backups/${req.params.tableName}/${suffix}-*.csv`;
   const [job] = await bq.createQueryJob({ query: `CREATE TABLE ${table(`export_${req.params.tableName}_${suffix}`)} AS SELECT * FROM ${table(req.params.tableName)}`, location: 'asia-south1' });
