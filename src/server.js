@@ -21,6 +21,15 @@ const firestore = getFirestore(firebaseApp);
 const googleAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 const app = express();
 const dirname = path.dirname(fileURLToPath(import.meta.url));
+app.post('/payments/webhook', express.raw({ type: 'application/json' }), async (req, res, next) => { try {
+  const signature = req.headers['x-razorpay-signature']; const expected = crypto.createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET || '').update(req.body).digest('hex');
+  if (!signature || !crypto.timingSafeEqual(Buffer.from(String(signature)), Buffer.from(expected))) return res.sendStatus(400);
+  const event = JSON.parse(req.body.toString('utf8')); const entity = event.payload?.payment?.entity || event.payload?.order?.entity; const orderId = entity?.order_id || entity?.id;
+  if (orderId && ['payment.captured', 'order.paid'].includes(event.event)) await updatePaymentState(orderId, 'PAID', entity.id);
+  if (orderId && event.event === 'payment.failed') await updatePaymentState(orderId, 'FAILED', entity.id);
+  if (orderId && ['refund.processed', 'refund.created'].includes(event.event)) await updatePaymentState(orderId, 'REFUNDED', entity.id);
+  res.sendStatus(200);
+} catch (e) { next(e); } });
 app.use(express.json());
 app.use(express.static(path.join(dirname, '..', 'public')));
 app.get('/generated-product-images/:id.png', async (req, res, next) => { try {
@@ -54,15 +63,17 @@ app.post('/payments/order', async (req, res, next) => { try {
   const items = Array.isArray(req.body.items) ? req.body.items : []; if (!items.length) return fail(res, 400, 'Cart is empty');
   const inventoryByName = await inventoryStockByName();
   let amount = 0; for (const item of items) { const snap = await firestore.collection('products').doc(String(item.productId)).get(); const product = snap.exists ? applyInventoryStock(snap.data(), inventoryByName) : null; if (!product?.active || Number(product.stock) < Number(item.quantity)) return fail(res, 409, 'A cart product is unavailable'); amount += Math.round(Number(product.price) * Number(item.quantity) * 100); }
-  const auth = Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString('base64'); const receipt = `nel_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
-  const razorpay = await fetch('https://api.razorpay.com/v1/orders', { method: 'POST', headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, currency: 'INR', receipt }) }); const order = await razorpay.json(); if (!razorpay.ok) return fail(res, 502, order.error?.description || 'Unable to create Razorpay order');
+  const receipt = `nel_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`; const order = await razorpayRequest('/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, currency: 'INR', receipt }) });
+  await firestore.collection('payment_orders').doc(order.id).set({ customerId: customer.customer_id, items, amount, currency: 'INR', status: 'CREATED', createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
   res.status(201).json({ id: order.id, amount: order.amount, currency: order.currency, customer: { name: customer.customer_name, email: customer.email, contact: customer.phone_number } });
 } catch (e) { next(e); } });
-app.post('/payments/verify', async (req, res, next) => { try { const expected = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '').update(`${req.body.razorpay_order_id}|${req.body.razorpay_payment_id}`).digest('hex'); if (expected !== req.body.razorpay_signature) return fail(res, 400, 'Payment signature verification failed'); res.json({ verified: true }); } catch (e) { next(e); } });
+app.post('/payments/verify', async (req, res, next) => { try { const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body; const record = await firestore.collection('payment_orders').doc(String(orderId || '')).get(); const customer = await currentSessionCustomer(req); if (!record.exists || !customer || record.data().customerId !== customer.customer_id) return fail(res, 401, 'Payment session is invalid'); const expected = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '').update(`${orderId}|${paymentId}`).digest('hex'); if (!signature || !crypto.timingSafeEqual(Buffer.from(String(signature)), Buffer.from(expected))) return fail(res, 400, 'Payment signature verification failed'); const [payment, order] = await Promise.all([razorpayRequest(`/payments/${paymentId}`), razorpayRequest(`/orders/${orderId}`)]); if (payment.order_id !== orderId || payment.status !== 'captured' || payment.amount !== order.amount || order.status !== 'paid') return fail(res, 400, 'Payment is not captured or does not match this order'); await updatePaymentState(orderId, 'VERIFIED', paymentId); res.json({ verified: true, razorpay_order_id: orderId, razorpay_payment_id: paymentId }); } catch (e) { next(e); } });
 
 const table = name => `\`${projectId}.${datasetId}.${name}\``;
 const now = () => new Date().toISOString();
 const id = prefix => `${prefix}-${crypto.randomUUID()}`;
+const razorpayRequest = async (path, options = {}) => { const auth = Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString('base64'); const response = await fetch(`https://api.razorpay.com/v1${path}`, { ...options, headers: { Authorization: `Basic ${auth}`, ...(options.headers || {}) } }); const body = await response.json(); if (!response.ok) throw Object.assign(new Error(body.error?.description || 'Razorpay request failed'), { status: 502 }); return body; };
+async function updatePaymentState(orderId, status, paymentId) { const ref = firestore.collection('payment_orders').doc(orderId); await ref.set({ status, paymentId: paymentId || '', updatedAt: FieldValue.serverTimestamp() }, { merge: true }); await rows(`UPDATE ${table('orders')} SET payment_status=@status, updated_at=CURRENT_TIMESTAMP() WHERE razorpay_order_id=@order_id`, { status, order_id: orderId }); }
 const productKey = value => String(value || '').toLowerCase().split('/')[0].replace(/[^a-z0-9]/g, '');
 function packageUnit(quantity, unit) {
   const amount = Number(quantity);
@@ -357,9 +368,11 @@ app.post('/orders', async (req, res, next) => { try {
   res.status(201).json(await insert('orders', row));
 } catch (e) { next(e); } });
 app.post('/checkout', async (req, res, next) => { try {
-  const { customer_id, items } = req.body;
+  const { customer_id, items, razorpay_order_id: razorpayOrderId, razorpay_payment_id: razorpayPaymentId } = req.body;
   if (!customer_id || !Array.isArray(items) || !items.length) return fail(res, 400, 'customer_id and one or more cart items are required');
   const signedInCustomer = await currentSessionCustomer(req); if (!signedInCustomer || signedInCustomer.customer_id !== customer_id) return fail(res, 401, 'Please sign in before checkout');
+  const paymentRecord = await firestore.collection('payment_orders').doc(String(razorpayOrderId || '')).get(); const paymentData = paymentRecord.data(); if (!paymentRecord.exists || paymentData.customerId !== customer_id || !['VERIFIED', 'PAID', 'COMPLETED'].includes(paymentData.status) || paymentData.paymentId !== razorpayPaymentId) return fail(res, 400, 'Payment is not verified for this checkout');
+  if (paymentData.status === 'COMPLETED') return res.json({ message: 'Order already placed', orders: paymentData.orders || [], total_amount: paymentData.amount / 100 });
   const [customer] = await rows(`SELECT customer_name, postal_code, address FROM ${table('customers')} WHERE customer_id=@id LIMIT 1`, { id: customer_id });
   if (!customer?.postal_code || !customer?.address) return fail(res, 400, 'A saved delivery address and PIN code are required before checkout');
   const requested = items.map(item => ({ productId: String(item.productId || ''), quantity: Number(item.quantity) })).filter(item => item.productId && Number.isInteger(item.quantity) && item.quantity > 0);
@@ -382,13 +395,14 @@ app.post('/checkout', async (req, res, next) => { try {
       const product = products.get(item.productId); const order_id = id('ORD'); const qr_id = qrId(customer_id, order_id, customer.postal_code);
       const png = await QRCode.toBuffer(qr_id, { type: 'png', errorCorrectionLevel: 'M' }); const qr_image_gcs_uri = `gs://${bucketName}/qr-codes/${order_id}.png`;
       await storage.bucket(bucketName).file(`qr-codes/${order_id}.png`).save(png, { contentType: 'image/png' });
-      const paid = req.body.payment_status === 'PAID'; const row = { order_id, qr_id, qr_image_gcs_uri, customer_id, customer_name: customer.customer_name, order_date: now(), product_name: product.name, quantity: item.quantity, unit: product.unit, price_per_unit: product.price, total_amount: Number(product.price) * item.quantity, postal_code: customer.postal_code, delivery_address: customer.address, order_status: paid ? 'PROCESSING' : 'PENDING', payment_status: paid ? 'PAID' : 'PENDING', created_at: now(), updated_at: now() };
+      const row = { order_id, qr_id, qr_image_gcs_uri, customer_id, customer_name: customer.customer_name, order_date: now(), product_name: product.name, quantity: item.quantity, unit: product.unit, price_per_unit: product.price, total_amount: Number(product.price) * item.quantity, postal_code: customer.postal_code, delivery_address: customer.address, order_status: 'PROCESSING', payment_status: 'PAID', razorpay_order_id: razorpayOrderId, razorpay_payment_id: razorpayPaymentId, created_at: now(), updated_at: now() };
       placed.push(await insert('orders', row));
     }
   } catch (error) {
     await firestore.runTransaction(async transaction => { for (const item of requested) transaction.update(firestore.collection('products').doc(item.productId), { stock: FieldValue.increment(item.quantity), updatedAt: FieldValue.serverTimestamp() }); });
     throw error;
   }
+  await firestore.collection('payment_orders').doc(razorpayOrderId).set({ status: 'COMPLETED', orders: placed.map(order => ({ order_id: order.order_id, total_amount: order.total_amount })), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   res.status(201).json({ message: 'Order placed successfully', orders: placed, total_amount: placed.reduce((sum, order) => sum + Number(order.total_amount), 0) });
 } catch (e) { next(e); } });
 app.patch('/orders/:id/status', async (req, res, next) => { try {

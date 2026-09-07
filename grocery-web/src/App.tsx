@@ -126,7 +126,7 @@ function Cart({ customer, cart, total, onChange, onClear }: { customer: Customer
     if (!customer) { window.location.assign('/login'); return; }
     setSubmitting(true); setMessage('');
     try {
-      await payForCart(cart, async () => { const response = await fetch(endpoint('/checkout'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customer_id: customer.customer_id, payment_status: 'PAID', items: cart.map(line => ({ productId: line.id, quantity: line.quantity })) }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Payment was received but order creation failed.'); onClear(); setMessage(`Payment successful. ${result.orders.length} item(s) are being prepared.`); });
+      await payForCart(cart, async payment => { const response = await fetch(endpoint('/checkout'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customer_id: customer.customer_id, razorpay_order_id: payment.razorpay_order_id, razorpay_payment_id: payment.razorpay_payment_id, items: cart.map(line => ({ productId: line.id, quantity: line.quantity })) }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Payment was received but order creation failed.'); onClear(); setMessage(`Payment successful. Your order is paid and processing. ${result.orders.length} item(s) are being prepared.`); });
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to place this order.'); }
     finally { setSubmitting(false); }
   };
