@@ -405,6 +405,7 @@ app.post('/checkout', async (req, res, next) => { try {
   await firestore.collection('payment_orders').doc(razorpayOrderId).set({ status: 'COMPLETED', orders: placed.map(order => ({ order_id: order.order_id, total_amount: order.total_amount })), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   res.status(201).json({ message: 'Order placed successfully', orders: placed, total_amount: placed.reduce((sum, order) => sum + Number(order.total_amount), 0) });
 } catch (e) { next(e); } });
+app.get('/orders/mine', async (req, res, next) => { try { const customer = await currentSessionCustomer(req); if (!customer) return fail(res, 401, 'Please sign in to view your orders'); res.json(await rows(`SELECT order_id, product_name, quantity, unit, total_amount, order_status, payment_status, order_date FROM ${table('orders')} WHERE customer_id=@customer_id ORDER BY order_date DESC LIMIT 100`, { customer_id: customer.customer_id })); } catch (e) { next(e); } });
 app.patch('/orders/:id/status', async (req, res, next) => { try {
   if (!statusOk(req.body.order_status, ['PENDING','PROCESSING','PACKED','SHIPPED','DELIVERED','CANCELLED'])) return fail(res, 400, 'Invalid order_status');
   await rows(`UPDATE ${table('orders')} SET order_status=@status, updated_at=CURRENT_TIMESTAMP() WHERE order_id=@id`, { status: req.body.order_status, id: req.params.id }); res.sendStatus(204);
