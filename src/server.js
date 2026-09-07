@@ -382,7 +382,7 @@ app.post('/checkout', async (req, res, next) => { try {
       const product = products.get(item.productId); const order_id = id('ORD'); const qr_id = qrId(customer_id, order_id, customer.postal_code);
       const png = await QRCode.toBuffer(qr_id, { type: 'png', errorCorrectionLevel: 'M' }); const qr_image_gcs_uri = `gs://${bucketName}/qr-codes/${order_id}.png`;
       await storage.bucket(bucketName).file(`qr-codes/${order_id}.png`).save(png, { contentType: 'image/png' });
-      const row = { order_id, qr_id, qr_image_gcs_uri, customer_id, customer_name: customer.customer_name, order_date: now(), product_name: product.name, quantity: item.quantity, unit: product.unit, price_per_unit: product.price, total_amount: Number(product.price) * item.quantity, postal_code: customer.postal_code, delivery_address: customer.address, order_status: 'PENDING', payment_status: req.body.payment_status === 'PAID' ? 'PAID' : 'PENDING', created_at: now(), updated_at: now() };
+      const paid = req.body.payment_status === 'PAID'; const row = { order_id, qr_id, qr_image_gcs_uri, customer_id, customer_name: customer.customer_name, order_date: now(), product_name: product.name, quantity: item.quantity, unit: product.unit, price_per_unit: product.price, total_amount: Number(product.price) * item.quantity, postal_code: customer.postal_code, delivery_address: customer.address, order_status: paid ? 'PROCESSING' : 'PENDING', payment_status: paid ? 'PAID' : 'PENDING', created_at: now(), updated_at: now() };
       placed.push(await insert('orders', row));
     }
   } catch (error) {

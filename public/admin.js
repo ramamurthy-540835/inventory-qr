@@ -11,7 +11,7 @@ async function load() {
     products = catalog;
     document.querySelector('#stats').innerHTML = [['Customers', dashboard.customers], ['Orders', dashboard.orders], ['Sales', money.format(dashboard.sales)], ['Products', dashboard.products], ['Low stock', dashboard.lowStock]].map(([label, value]) => `<div class="stat"><small>${label}</small><b>${value}</b></div>`).join('');
     render();
-    document.querySelector('#orders').innerHTML = orders.length ? orders.map(order => `<div class="order"><span>${order.order_id}</span><span>${order.customer_name || '—'}</span><span>${order.product_name}</span><span>${money.format(order.total_amount)}</span><span>${order.order_status}</span></div>`).join('') : '<p class="muted">No orders yet.</p>';
+    document.querySelector('#orders').innerHTML = orders.length ? orders.map(order => `<div class="order"><span>${order.order_id}</span><span>${order.customer_name || '—'}</span><span>${order.product_name}</span><span>${money.format(order.total_amount)}</span><span>Payment: ${order.payment_status}</span><span>Order: ${order.order_status}</span></div>`).join('') : '<p class="muted">No orders yet.</p>';
   } catch (error) { document.querySelector('main').innerHTML = `<section class="panel"><h2>Admin access required</h2><p class="muted">${error.message}</p></section>`; }
 }
 document.querySelector('#search').oninput = render;

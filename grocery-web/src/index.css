@@ -13,6 +13,9 @@
 body { margin: 0; min-width: 320px; }
 button, input { font: inherit; }
 
+/* Product and order text must remain readable at every viewport width. */
+.truncate { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+
 @media (max-width: 639px) {
   body:has(nav.fixed) { padding-bottom: 78px; }
   main .grid.grid-cols-2 > article { min-width: 0; }
