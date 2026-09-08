@@ -257,13 +257,11 @@ app.patch('/inventory/:id/quantity', async (req, res, next) => { try {
 } catch (e) { next(e); } });
 app.post('/customers', async (req, res, next) => { try {
   const x = req.body; if (!x.customer_name) return fail(res, 400, 'customer_name is required');
-  let generatedId = String(x.customer_id || '').trim();
-  if (!generatedId) {
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      generatedId = `NEL${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
-      const matches = await rows(`SELECT 1 FROM ${table('customers')} WHERE customer_id=@id LIMIT 1`, { id: generatedId });
-      if (!matches.length) break;
-    }
+  let generatedId = '';
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    generatedId = `NEL${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+    const matches = await rows(`SELECT 1 FROM ${table('customers')} WHERE customer_id=@id LIMIT 1`, { id: generatedId });
+    if (!matches.length) break;
   }
   if (!/^[A-Za-z0-9_-]{1,15}$/.test(generatedId)) return fail(res, 400, 'customer_id must use up to 15 letters, numbers, hyphens, or underscores');
   const existing = await rows(`SELECT 1 FROM ${table('customers')} WHERE customer_id=@id LIMIT 1`, { id: generatedId });
