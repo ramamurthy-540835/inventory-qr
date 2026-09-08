@@ -22,7 +22,12 @@ img { max-width: 100%; }
 
 @media (max-width: 639px) {
   header a[href="/app"] > span { display: none !important; }
-  header > div { width: 100%; }
+  header { width: 100%; }
+  header > div { width: 100%; min-width: 0; gap: 0.5rem; }
+  header > div > a[href="/app"] { width: 2.25rem; }
+  header > div > label { width: 0; max-width: none; flex: 1 1 0%; }
+  header > div > label input { width: 0; min-width: 0; }
+  header > div > button:last-child { flex: 0 0 2.5rem; }
   main, main > div, main article, main aside { min-width: 0; max-width: 100%; }
   main h1, main h2, main p, main a, main button, main label, main span { overflow-wrap: anywhere; }
   main button, main select { overflow-wrap: normal; }
