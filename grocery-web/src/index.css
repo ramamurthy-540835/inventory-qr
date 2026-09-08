@@ -10,25 +10,30 @@
 }
 
 :root { color: #18251d; background: #f7faf6; font-synthesis: none; text-rendering: optimizeLegibility; }
-body { margin: 0; min-width: 320px; }
-button, input { font: inherit; }
+* { box-sizing: border-box; }
+html, body, #root { width: 100%; min-width: 320px; }
+body { margin: 0; overflow-x: hidden; }
+button, input, select, textarea { font: inherit; }
+img { max-width: 100%; }
 
 /* Product and order text must remain readable at every viewport width. */
 .truncate { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
 .brand-wordmark { display: inline; }
 
 @media (max-width: 639px) {
-  header a[href="/app"] > span { display: inline !important; font-size: 1rem; }
-  html, body { overflow-x: hidden; }
+  header a[href="/app"] > span { display: none !important; }
+  header > div { width: 100%; }
   main, main > div, main article, main aside { min-width: 0; max-width: 100%; }
   main h1, main h2, main p, main a, main button, main label, main span { overflow-wrap: anywhere; }
+  main button, main select { overflow-wrap: normal; }
   main .grid.grid-cols-2 > article p { white-space: normal; overflow: visible; text-overflow: clip; }
-  main .grid.grid-cols-2 > article > div:last-child { flex-wrap: wrap; }
+  main .grid.grid-cols-2 > article > div:last-child { flex-wrap: wrap; row-gap: 0.4rem; }
   main select { min-width: 0; max-width: 100%; }
   body:has(nav.fixed) { padding-bottom: 78px; }
   main .grid.grid-cols-2 > article { min-width: 0; }
-  main .grid.grid-cols-2 > article button { max-width: 58px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  main .grid.grid-cols-2 > article button { max-width: none; overflow: visible; white-space: nowrap; }
   main .space-y-3 > div { flex-wrap: wrap; }
   main .space-y-3 > div > div:nth-child(2) { min-width: 0; }
   main .space-y-3 > div > button:last-child { margin-left: auto; }
+  footer button { max-width: 100%; }
 }
