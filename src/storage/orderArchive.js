@@ -3,6 +3,7 @@
 const { Storage } = require('@google-cloud/storage');
 const config = require('../notify/config');
 const { receiptHtml } = require('../notify/templates');
+const { generate80gPdf } = require('./80gDocument');
 
 const storage = new Storage({ projectId: config.project });
 const bucket = () => storage.bucket(config.bucket);
@@ -70,6 +71,7 @@ async function archiveOrder(order) {
 
   const objects = {};
   const tasks = [];
+  const documentPdf = await generate80gPdf(order);
 
   // 1. Canonical order record (immutable snapshot, money as strings)
   tasks.push(
@@ -89,6 +91,10 @@ async function archiveOrder(order) {
       'text/html; charset=utf-8',
       meta
     ).then((uri) => (objects.receipt = uri))
+  );
+
+  tasks.push(
+    writeObject(`${prefix}/80g.pdf`, documentPdf, 'application/pdf', meta).then((uri) => (objects.document = uri))
   );
 
   // 3. QR PNG — copy the existing qr-codes/ object into the order folder if present
@@ -114,10 +120,11 @@ async function archiveOrder(order) {
 
   const links = {
     receipt: await signedUrl(`${prefix}/receipt.html`),
+    document: await signedUrl(`${prefix}/80g.pdf`),
     qr: objects.qr ? await signedUrl(`${prefix}/qr.png`) : null,
   };
 
-  return { prefix, objects, links };
+  return { prefix, objects, links, document_base64: documentPdf.toString('base64') };
 }
 
 /** Idempotency marker so a retried webhook never double-sends. */

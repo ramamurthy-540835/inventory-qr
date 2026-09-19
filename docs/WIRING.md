@@ -62,18 +62,17 @@ Never put the token in `.env`, the README, or a commit. Use a **permanent** Syst
 ```bash
 gcloud run deploy nelture-grocery \
   --source . --region asia-south1 \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=customer-grocery-507211,\
-GCS_BUCKET=customer-grocery-507211-inventory-management,\
+  --set-env-vars "GOOGLE_CLOUD_PROJECT=aidirac-503309,\
+GCS_BUCKET=aidirac-503309-inventory-management,\
 BQ_DATASET=inventory_management,\
 APP_BASE_URL=https://nelture-grocery-foovqasysa-el.a.run.app/app/,\
 BRAND_NAME=Nelture Grocery,\
 SUPPORT_EMAIL=ai@nelture.ai,\
 MAIL_FROM=Nelture Grocery <ai@nelture.ai>,\
 SMTP_HOST=smtp-relay.brevo.com,SMTP_PORT=587,SMTP_USER=ai@nelture.ai,\
-WA_PHONE_NUMBER_ID=YOUR_PHONE_NUMBER_ID,\
-WA_TEMPLATE_NAME=order_confirmation,WA_TEMPLATE_LANG=en,\
-EMAIL_ENABLED=true,WHATSAPP_ENABLED=true,NOTIFY_TIMEOUT_MS=8000" \
-  --set-secrets "SMTP_PASS=SMTP_PASS:latest,WA_ACCESS_TOKEN=WA_ACCESS_TOKEN:latest"
+OPENCLAW_DELIVERY_URL=https://openclaw-delivery-foovqasysa-el.a.run.app/v1/whatsapp/documents,\
+EMAIL_ENABLED=true,WHATSAPP_ENABLED=true,OPENCLAW_ENABLED=true,NOTIFY_TIMEOUT_MS=8000" \
+  --set-secrets "SMTP_PASS=SMTP_PASS:latest,OPENCLAW_DELIVERY_TOKEN=openclaw-delivery-token:latest"
 ```
 
 Kill switches: `EMAIL_ENABLED=false` / `WHATSAPP_ENABLED=false` disable a channel without a code change. Unset secrets = channel logs `skipped`, order still completes.
@@ -106,7 +105,13 @@ Prerequisites before the first send: a verified Meta Business account, a WhatsAp
 
 Also: Meta requires opt-in. Add a checkbox at checkout — "Send order updates to my WhatsApp number" — and store the consent flag on the customer row. That's both a policy requirement and DPDP Act hygiene.
 
-## 7. Smoke test
+## 7. WhatsApp through OpenClaw
+
+The backend sends the generated `80g.pdf` to the existing authenticated OpenClaw bridge at `POST /v1/whatsapp/documents` with the registered phone number, filename, base64 PDF, and caption. The delivery token belongs in Secret Manager only. OpenClaw must already have a linked WhatsApp session.
+
+The customer-facing success page reads the notification audit record and shows the actual registered number used for delivery.
+
+## 8. Smoke test
 
 ```bash
 # after deploy, with an order that exists
@@ -114,9 +119,9 @@ curl -X POST https://nelture-grocery-foovqasysa-el.a.run.app/orders/ORD-053f08ef
   -H "x-admin-token: $ADMIN_TOKEN"
 ```
 
-Expected: `email=sent whatsapp=sent`, two rows in `notification_log`, and the three objects under `orders/2026/09/19/<order_id>/`.
+Expected: `email=sent whatsapp=sent`, two rows in `notification_log`, and `order.json`, `receipt.html`, `80g.pdf`, and `qr.png` under `orders/2026/09/19/<order_id>/`.
 
-## 8. Still open on this repo
+## 9. Still open on this repo
 
 - Branded domain in front of the raw `run.app` URL — a grocery checkout emailing links from `foovqasysa-el.a.run.app` reads as phishing to most customers and to Gmail's spam filter. Point `grocery.nelture.ai` at the service and set `APP_BASE_URL` to it before any real traffic.
 - The repo is public with a live GCP project ID in the README. Nothing secret there by itself, but audit the history for any credential before you promote this.

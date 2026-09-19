@@ -74,7 +74,10 @@ async function dispatchOrderConfirmation(rawOrder, opts = {}) {
   // 1. GCS first — the record of truth survives even if both channels fail.
   let archive = { prefix: null, objects: {}, links: {} };
   try {
-    archive = await archiveOrder(order);
+    const archived = await archiveOrder(order);
+    const { document_base64: documentBase64, ...archiveResult } = archived;
+    archive = archiveResult;
+    order.document_base64 = documentBase64;
     order.links = archive.links;
     order.gcs_prefix = archive.prefix;
   } catch (err) {

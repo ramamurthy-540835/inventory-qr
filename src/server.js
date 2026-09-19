@@ -24,6 +24,7 @@ const app = express();
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const { dispatchOrderConfirmation } = require('./notify/dispatch.js');
+const { orderPrefix, exists: storageObjectExists, signedUrl } = require('./storage/orderArchive.js');
 app.post('/payments/webhook', express.raw({ type: 'application/json' }), async (req, res, next) => { try {
   const signature = req.headers['x-razorpay-signature']; const expected = crypto.createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET || '').update(req.body).digest('hex');
   if (!signature || !crypto.timingSafeEqual(Buffer.from(String(signature)), Buffer.from(expected))) return res.sendStatus(400);
@@ -420,6 +421,27 @@ app.post('/checkout', async (req, res, next) => { try {
   res.status(201).json({ message: 'Order placed successfully', orders: placed, total_amount: placed.reduce((sum, order) => sum + Number(order.total_amount), 0) });
 } catch (e) { next(e); } });
 app.get('/orders/mine', async (req, res, next) => { try { const customer = await currentSessionCustomer(req); if (!customer) return fail(res, 401, 'Please sign in to view your orders'); res.json(await rows(`SELECT order_id, product_name, quantity, unit, total_amount, order_status, payment_status, order_date FROM ${table('orders')} WHERE customer_id=@customer_id ORDER BY order_date DESC LIMIT 100`, { customer_id: customer.customer_id })); } catch (e) { next(e); } });
+app.get('/orders/:id/notification-status', async (req, res, next) => { try {
+  const customer = await currentSessionCustomer(req); if (!customer) return fail(res, 401, 'Please sign in to view notification status');
+  const [order] = await rows(`SELECT order_id, customer_id, order_date, payment_status FROM ${table('orders')} WHERE order_id=@id AND customer_id=@customer_id LIMIT 1`, { id: req.params.id, customer_id: customer.customer_id });
+  if (!order) return fail(res, 404, 'Order not found');
+  const prefix = orderPrefix(order.order_id, new Date(order.order_date));
+  const documentPath = `${prefix}/80g.pdf`;
+  const documentGenerated = await storageObjectExists(documentPath);
+  const documentUrl = documentGenerated ? await signedUrl(documentPath) : null;
+  const notifications = await rows(`SELECT channel, status, recipient, error_message, created_at FROM ${table('notification_log')} WHERE order_id=@order_id ORDER BY created_at DESC`, { order_id: order.order_id });
+  const whatsapp = notifications.find(item => item.channel === 'whatsapp') || null;
+  res.json({
+    order_id: order.order_id,
+    document_generated: documentGenerated,
+    document_url: documentUrl,
+    whatsapp: {
+      status: whatsapp?.status || 'pending',
+      detail: whatsapp?.error_message || '',
+      phone_number: customer.phone_number || whatsapp?.recipient || '',
+    },
+  });
+} catch (e) { next(e); } });
 app.post('/orders/:id/resend-confirmation', async (req, res, next) => { try {
   if (!await requireAdmin(req)) return fail(res, 403, 'Admin access required');
   const [order] = await rows(`SELECT o.*, c.email, c.phone_number FROM ${table('orders')} o LEFT JOIN ${table('customers')} c ON c.customer_id=o.customer_id WHERE o.order_id=@id LIMIT 1`, { id: req.params.id });

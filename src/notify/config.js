@@ -44,12 +44,13 @@ const config = {
 
   whatsapp: {
     enabled: bool(process.env.WHATSAPP_ENABLED, true),
-    phoneNumberId: process.env.WA_PHONE_NUMBER_ID || '',
-    token: process.env.WA_ACCESS_TOKEN || '',
-    apiVersion: process.env.WA_API_VERSION || 'v21.0',
-    template: process.env.WA_TEMPLATE_NAME || 'order_confirmation',
-    lang: process.env.WA_TEMPLATE_LANG || 'en',
     defaultCountryCode: process.env.WA_DEFAULT_CC || '91', // India
+  },
+
+  openclaw: {
+    enabled: bool(process.env.OPENCLAW_ENABLED, true),
+    url: (process.env.OPENCLAW_DELIVERY_URL || 'https://openclaw-delivery-foovqasysa-el.a.run.app/v1/whatsapp/documents').replace(/\/$/, ''),
+    token: process.env.OPENCLAW_DELIVERY_TOKEN || '',
   },
 
   // Hard ceiling so checkout never hangs on a third party
@@ -57,8 +58,6 @@ const config = {
 };
 
 config.email.configured = Boolean(config.email.enabled && config.email.host && config.email.user && config.email.pass);
-config.whatsapp.configured = Boolean(
-  config.whatsapp.enabled && config.whatsapp.phoneNumberId && config.whatsapp.token
-);
+config.whatsapp.configured = Boolean(config.whatsapp.enabled && config.openclaw.enabled && config.openclaw.token);
 
 module.exports = config;
