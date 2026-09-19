@@ -8,6 +8,12 @@ const { sendOrderWhatsApp } = require('./whatsapp');
 
 const bq = new BigQuery({ projectId: config.project });
 
+function isoTimestamp(value) {
+  const raw = value?.value || value?.toDate?.() || value;
+  const date = raw instanceof Date ? raw : new Date(raw || Date.now());
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+}
+
 /**
  * Normalise whatever the order route already has into the shape the archive
  * and templates expect. Everything is optional except order_id.
@@ -38,7 +44,7 @@ function buildOrderPayload(input = {}) {
     payment_status: input.payment_status || 'paid',
     payment_reference: input.payment_reference || input.payment_id || null,
     order_status: input.order_status || input.status || 'processing',
-    placed_at: input.placed_at || input.created_at || new Date().toISOString(),
+    placed_at: isoTimestamp(input.placed_at || input.created_at),
     total_amount: String(total),
     currency: input.currency || 'INR',
     qr_id: input.qr_id || null,

@@ -71,7 +71,7 @@ SUPPORT_EMAIL=ai@nelture.ai,\
 MAIL_FROM=Nelture Grocery <ai@nelture.ai>,\
 SMTP_HOST=smtp-relay.brevo.com,SMTP_PORT=587,SMTP_USER=ai@nelture.ai,\
 OPENCLAW_DELIVERY_URL=https://openclaw-delivery-foovqasysa-el.a.run.app/v1/whatsapp/documents,\
-EMAIL_ENABLED=true,WHATSAPP_ENABLED=true,OPENCLAW_ENABLED=true,NOTIFY_TIMEOUT_MS=8000" \
+EMAIL_ENABLED=true,WHATSAPP_ENABLED=true,OPENCLAW_ENABLED=true,NOTIFY_TIMEOUT_MS=30000" \
   --set-secrets "SMTP_PASS=SMTP_PASS:latest,OPENCLAW_DELIVERY_TOKEN=openclaw-delivery-token:latest"
 ```
 

@@ -54,7 +54,7 @@ const config = {
   },
 
   // Hard ceiling so checkout never hangs on a third party
-  timeoutMs: Number(process.env.NOTIFY_TIMEOUT_MS || 8000),
+  timeoutMs: Number(process.env.NOTIFY_TIMEOUT_MS || 30000),
 };
 
 config.email.configured = Boolean(config.email.enabled && config.email.host && config.email.user && config.email.pass);
