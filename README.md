@@ -22,3 +22,10 @@ The bucket folders are prefixes (not physical directories): `materials/`, `inven
 Customer IDs are created by the API as the first four alphabetic characters of the customer name plus three random digits (for example, `ANUR482`). The service checks each generated ID for duplicates, never exposes a customer-ID update route, sets `created_at` and `updated_at` to the current timestamp on creation, and refreshes `updated_at` on every customer modification. It creates UUID-based material/stock/order IDs and makes each QR ID from a five-letter customer/order hash + a microsecond sequence + a postcode-derived two-letter location code. It verifies QR uniqueness before insert and uploads the PNG to `qr-codes/`.
 
 Grant the deployed service account `roles/bigquery.dataEditor`, `roles/bigquery.jobUser`, and `roles/storage.objectAdmin` scoped to this dataset/bucket.
+## Notifications
+
+Paid checkout archives an order snapshot and receipt in Cloud Storage, then attempts email and WhatsApp delivery. Notification failures are recorded and do not fail the order. The operator resend route is `POST /orders/:id/resend-confirmation` and uses the existing admin session.
+
+Environment variable names:
+
+`GOOGLE_CLOUD_PROJECT`, `GCS_BUCKET`, `BQ_DATASET`, `BQ_NOTIFICATION_TABLE`, `APP_BASE_URL`, `BRAND_NAME`, `SUPPORT_EMAIL`, `SUPPORT_PHONE`, `BRAND_ADDRESS`, `ARCHIVE_ENABLED`, `SIGNED_URL_DAYS`, `EMAIL_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `MAIL_REPLY_TO`, `MAIL_BCC`, `WHATSAPP_ENABLED`, `WA_PHONE_NUMBER_ID`, `WA_ACCESS_TOKEN`, `WA_API_VERSION`, `WA_TEMPLATE_NAME`, `WA_TEMPLATE_LANG`, `WA_DEFAULT_CC`, `NOTIFY_TIMEOUT_MS`.
