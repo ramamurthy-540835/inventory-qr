@@ -3,7 +3,6 @@
 const { BigQuery } = require('@google-cloud/bigquery');
 const config = require('./config');
 const { archiveOrder, claimNotification, releaseNotification } = require('../storage/orderArchive');
-const { sendOrderEmail } = require('./email');
 const { sendOrderWhatsApp } = require('./whatsapp');
 
 const bq = new BigQuery({ projectId: config.project });
@@ -66,7 +65,7 @@ async function logNotification(row) {
 }
 
 /**
- * Archive the order to GCS, then notify the customer on email + WhatsApp.
+ * Archive the order to GCS, then notify the customer on WhatsApp.
  * Safe to call twice for the same order: per-channel GCS markers prevent re-sends.
  *
  * @param {object} rawOrder
@@ -92,7 +91,6 @@ async function dispatchOrderConfirmation(rawOrder, opts = {}) {
 
   // 2. Fan out, never throwing.
   const channels = [
-    { name: 'email', run: () => sendOrderEmail(order) },
     { name: 'whatsapp', run: () => sendOrderWhatsApp(order) },
   ];
 
@@ -123,7 +121,7 @@ async function dispatchOrderConfirmation(rawOrder, opts = {}) {
         order_id: order.order_id,
         customer_id: order.customer_id,
         channel: r.channel,
-        recipient: r.channel === 'email' ? order.customer_email : order.customer_phone,
+        recipient: order.customer_phone,
         status: r.status,
         provider_reference: r.status === 'sent' ? r.detail : null,
         error_message: r.status === 'failed' ? r.detail : null,
