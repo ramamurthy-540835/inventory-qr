@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bell, ChevronRight, Heart, Home, MapPin, Menu, Minus, PackageOpen, Plus, Search, ShoppingBag, ShoppingCart, UserRound, X } from 'lucide-react';
+import { Bell, ChevronRight, FileCheck2, Heart, Home, MapPin, Menu, MessageCircle, Minus, PackageOpen, Plus, Search, ShoppingBag, ShoppingCart, UserRound, X } from 'lucide-react';
 import { endpoint, getCatalog } from './services/api';
 import { payForCart } from './services/razorpay';
 import type { CartLine, Customer, Product } from './types/commerce';
@@ -65,13 +65,29 @@ function App() {
   const legalPage = currentLegalPage();
   if (legalPage) return <LegalPageView page={legalPage} />;
   const orderIds = currentOrderSuccess();
-  if (orderIds) return <OrderSuccessPage orderIds={orderIds} />;
+  if (orderIds) return <EnhancedOrderSuccessPage orderIds={orderIds} />;
   return <Storefront />;
+}
+
+type NotificationStatus = { order_id: string; document_generated: boolean; document_url: string | null; whatsapp: { status: string; detail: string; phone_number: string } };
+function EnhancedOrderSuccessPage({ orderIds }: { orderIds: string[] }) {
+  const [statuses, setStatuses] = useState<NotificationStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let active = true;
+    const check = () => Promise.all(orderIds.map(id => fetch(endpoint(`/orders/${encodeURIComponent(id)}/notification-status`)).then(response => response.ok ? response.json() as Promise<NotificationStatus> : Promise.reject(new Error('Unable to check document status.'))))).then(data => { if (active) setStatuses(data); }).catch(() => {}).finally(() => { if (active) setLoading(false); });
+    check();
+    const timer = window.setInterval(check, 5000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [orderIds.join(',')]);
+  return <div className="grid min-h-screen place-items-center bg-[#f7faf6] px-4 py-10 text-[#18251d]"><main className="w-full max-w-lg rounded-3xl bg-white p-7 text-center shadow-sm sm:p-10"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-nelture-100 text-3xl text-nelture-700">âœ“</div><h1 className="mt-5 text-2xl font-black sm:text-3xl">Your order has been placed successfully</h1><p className="mt-3 text-sm leading-6 text-slate-600">Payment received. Your order is paid and is now being processed.</p><div className="mt-6 rounded-2xl bg-nelture-50 p-4 text-left"><p className="text-xs font-bold uppercase tracking-wider text-nelture-700">Generated order ID{orderIds.length > 1 ? 's' : ''}</p><div className="mt-2 space-y-2">{orderIds.map(id => <p key={id} className="break-all font-mono text-sm font-black text-nelture-700">{id}</p>)}</div></div><section className="mt-4 space-y-3 text-left">{loading && <div className="rounded-2xl border border-[#dce7d8] p-4 text-sm text-slate-600">Checking your 80G document and WhatsApp delivery...</div>}{statuses.map(status => <div key={status.order_id} className="rounded-2xl border border-[#dce7d8] bg-white p-4"><div className="flex items-start gap-3"><FileCheck2 className="mt-0.5 shrink-0 text-nelture-700" size={22}/><div className="min-w-0"><p className="font-black">80G document {status.document_generated ? 'generated' : 'is being prepared'}</p>{status.document_generated && status.whatsapp.status === 'sent' ? <p className="mt-1 flex items-start gap-2 text-sm leading-5 text-slate-600"><MessageCircle className="mt-0.5 shrink-0 text-nelture-700" size={16}/>Sent through WhatsApp to <strong className="break-all text-slate-800">{status.whatsapp.phone_number}</strong></p> : <p className="mt-1 text-sm leading-5 text-slate-600">WhatsApp delivery status: {status.whatsapp.status}. Your order remains confirmed.</p>}{status.document_url && <a href={status.document_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-sm font-bold text-nelture-700 hover:underline">Open 80G document</a>}</div></div></div>)}</section><a href="/app/" className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-nelture-600 px-4 py-3 text-sm font-bold text-white hover:bg-nelture-700">Return to Homepage</a></main></div>;
 }
 
 function OrderSuccessPage({ orderIds }: { orderIds: string[] }) {
   return <div className="grid min-h-screen place-items-center bg-[#f7faf6] px-4 py-10 text-[#18251d]"><main className="w-full max-w-lg rounded-3xl bg-white p-7 text-center shadow-sm sm:p-10"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-nelture-100 text-3xl text-nelture-700">✓</div><h1 className="mt-5 text-2xl font-black sm:text-3xl">Your order has been placed successfully</h1><p className="mt-3 text-sm leading-6 text-slate-600">Payment received. Your order is paid and is now being processed.</p><div className="mt-6 rounded-2xl bg-nelture-50 p-4 text-left"><p className="text-xs font-bold uppercase tracking-wider text-nelture-700">Generated order ID{orderIds.length > 1 ? 's' : ''}</p><div className="mt-2 space-y-2">{orderIds.map(id => <p key={id} className="break-all font-mono text-sm font-black text-nelture-700">{id}</p>)}</div></div><a href="/app/" className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-nelture-600 px-4 py-3 text-sm font-bold text-white hover:bg-nelture-700">Return to Homepage</a></main></div>;
 }
+
+void OrderSuccessPage;
 
 function Storefront() {
   const [tab, setTab] = useState<Tab>('home');

@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { GoogleAuth } from 'google-auth-library';
@@ -21,6 +22,9 @@ const firestore = getFirestore(firebaseApp);
 const googleAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 const app = express();
 const dirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+const { dispatchOrderConfirmation } = require('./notify/dispatch.js');
+const { orderPrefix, exists: storageObjectExists, signedUrl } = require('./storage/orderArchive.js');
 app.post('/payments/webhook', express.raw({ type: 'application/json' }), async (req, res, next) => { try {
   const signature = req.headers['x-razorpay-signature']; const expected = crypto.createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET || '').update(req.body).digest('hex');
   if (!signature || !crypto.timingSafeEqual(Buffer.from(String(signature)), Buffer.from(expected))) return res.sendStatus(400);
@@ -371,7 +375,7 @@ app.post('/checkout', async (req, res, next) => { try {
   const signedInCustomer = await currentSessionCustomer(req); if (!signedInCustomer || signedInCustomer.customer_id !== customer_id) return fail(res, 401, 'Please sign in before checkout');
   const paymentRecord = await firestore.collection('payment_orders').doc(String(razorpayOrderId || '')).get(); const paymentData = paymentRecord.data(); if (!paymentRecord.exists || paymentData.customerId !== customer_id || !['VERIFIED', 'PAID', 'COMPLETED'].includes(paymentData.status) || paymentData.paymentId !== razorpayPaymentId) return fail(res, 400, 'Payment is not verified for this checkout');
   if (paymentData.status === 'COMPLETED') return res.json({ message: 'Order already placed', orders: paymentData.orders || [], total_amount: paymentData.amount / 100 });
-  const [customer] = await rows(`SELECT customer_name, postal_code, address FROM ${table('customers')} WHERE customer_id=@id LIMIT 1`, { id: customer_id });
+  const [customer] = await rows(`SELECT customer_name, email, phone_number, postal_code, address FROM ${table('customers')} WHERE customer_id=@id LIMIT 1`, { id: customer_id });
   if (!customer?.postal_code || !customer?.address) return fail(res, 400, 'A saved delivery address and PIN code are required before checkout');
   const requested = items.map(item => ({ productId: String(item.productId || ''), quantity: Number(item.quantity) })).filter(item => item.productId && Number.isInteger(item.quantity) && item.quantity > 0);
   if (requested.length !== items.length) return fail(res, 400, 'Cart contains an invalid item quantity');
@@ -401,9 +405,56 @@ app.post('/checkout', async (req, res, next) => { try {
     throw error;
   }
   await firestore.collection('payment_orders').doc(razorpayOrderId).set({ status: 'COMPLETED', orders: placed.map(order => ({ order_id: order.order_id, total_amount: order.total_amount })), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  for (const order of placed) {
+    try {
+      await dispatchOrderConfirmation({
+        ...order,
+        customer_email: customer.email,
+        customer_phone: customer.phone_number,
+        qr_object_path: `qr-codes/${order.order_id}.png`,
+        items: [order],
+      });
+    } catch (error) {
+      console.error('[orders] notify dispatch error', order.order_id, error.message);
+    }
+  }
   res.status(201).json({ message: 'Order placed successfully', orders: placed, total_amount: placed.reduce((sum, order) => sum + Number(order.total_amount), 0) });
 } catch (e) { next(e); } });
 app.get('/orders/mine', async (req, res, next) => { try { const customer = await currentSessionCustomer(req); if (!customer) return fail(res, 401, 'Please sign in to view your orders'); res.json(await rows(`SELECT order_id, product_name, quantity, unit, total_amount, order_status, payment_status, order_date FROM ${table('orders')} WHERE customer_id=@customer_id ORDER BY order_date DESC LIMIT 100`, { customer_id: customer.customer_id })); } catch (e) { next(e); } });
+app.get('/orders/:id/notification-status', async (req, res, next) => { try {
+  const customer = await currentSessionCustomer(req); if (!customer) return fail(res, 401, 'Please sign in to view notification status');
+  const [order] = await rows(`SELECT order_id, customer_id, order_date, payment_status FROM ${table('orders')} WHERE order_id=@id AND customer_id=@customer_id LIMIT 1`, { id: req.params.id, customer_id: customer.customer_id });
+  if (!order) return fail(res, 404, 'Order not found');
+  const prefix = orderPrefix(order.order_id, new Date(order.order_date));
+  const documentPath = `${prefix}/80g.pdf`;
+  const documentGenerated = await storageObjectExists(documentPath);
+  const documentUrl = documentGenerated ? await signedUrl(documentPath) : null;
+  const notifications = await rows(`SELECT channel, status, recipient, error_message, created_at FROM ${table('notification_log')} WHERE order_id=@order_id ORDER BY created_at DESC`, { order_id: order.order_id });
+  const whatsapp = notifications.find(item => item.channel === 'whatsapp') || null;
+  res.json({
+    order_id: order.order_id,
+    document_generated: documentGenerated,
+    document_url: documentUrl,
+    whatsapp: {
+      status: whatsapp?.status || 'pending',
+      detail: whatsapp?.error_message || '',
+      phone_number: customer.phone_number || whatsapp?.recipient || '',
+    },
+  });
+} catch (e) { next(e); } });
+app.post('/orders/:id/resend-confirmation', async (req, res, next) => { try {
+  if (!await requireAdmin(req)) return fail(res, 403, 'Admin access required');
+  const [order] = await rows(`SELECT o.*, c.email, c.phone_number FROM ${table('orders')} o LEFT JOIN ${table('customers')} c ON c.customer_id=o.customer_id WHERE o.order_id=@id LIMIT 1`, { id: req.params.id });
+  if (!order) return fail(res, 404, 'Order not found');
+  const result = await dispatchOrderConfirmation({
+    ...order,
+    customer_email: order.email,
+    customer_phone: order.phone_number,
+    qr_object_path: `qr-codes/${order.order_id}.png`,
+    items: [order],
+  }, { force: true });
+  res.json(result);
+} catch (e) { next(e); } });
 app.patch('/orders/:id/status', async (req, res, next) => { try {
   if (!statusOk(req.body.order_status, ['PENDING','PROCESSING','PACKED','SHIPPED','DELIVERED','CANCELLED'])) return fail(res, 400, 'Invalid order_status');
   await rows(`UPDATE ${table('orders')} SET order_status=@status, updated_at=CURRENT_TIMESTAMP() WHERE order_id=@id`, { status: req.body.order_status, id: req.params.id }); res.sendStatus(204);
