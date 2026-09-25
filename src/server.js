@@ -92,7 +92,9 @@ async function inventoryStockByName() {
 }
 function applyInventoryStock(product, inventoryByName) {
   const stock = inventoryByName.get(productKey(product.name));
-  return stock ? { ...product, price: Number(stock.price), stock: Number(product.stock || 100), unit: packageUnit(stock.quantity, stock.unit) || product.unit, categoryId: stock.category || product.categoryId } : product;
+  // Product variants are authoritative for price and unit. Inventory only
+  // supplies availability so duplicate names can have different pack sizes.
+  return stock ? { ...product, stock: Number(product.stock || 100) } : product;
 }
 function normalizeCartItems(items) {
   return items.map(item => ({
