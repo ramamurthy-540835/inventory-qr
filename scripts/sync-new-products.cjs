@@ -21,7 +21,15 @@ const products = [
   ['Tamarind','1 kg',391,'cooking-essentials'],['Tamarind','500 g',197,'cooking-essentials'],['Test Product','1 piece',1,'cooking-essentials'],['Toor Dal','1 kg',170,'dals-pulses'],['Toor Dal','500 g',86.50,'dals-pulses'],
 ];
 const slug = value => value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-const images = { Rice:'/product-images/rice-5kg.webp','Raw Rice':'/product-images/rice-5kg.webp',Atta:'/product-images/atta-1kg.webp','Gingelly Oil':'/product-images/gingelly-oil-1l.webp','Groundnut Oil':'/product-images/gingelly-oil-1l.webp','Sambar Powder':'/product-images/sambar-powder-100g.webp',Sugar:'/product-images/sugar-500g.webp','Cashew Nut':'/product-images/cashew-nut-50g.webp' };
+const images = {
+  Atta:'/product-images/atta-1kg.webp','Black Channa':'/product-images/black-channa-500g.webp','Cashew Nut':'/product-images/cashew-nut-50g.webp',
+  Elaichi:'/product-images/elaichi-5g.webp','Gingelly Oil':'/product-images/gingelly-oil-1l.webp','Gram Dal':'/product-images/gram-dal-500g.webp',
+  Groundnut:'/product-images/groundnut-100g.webp','Groundnut Oil':'/product-images/groundnut-oil-1l.png','Jeera':'/product-images/jeera-100g.webp',
+  'Moong Dal':'/product-images/moong-dal-500g.webp',Pepper:'/product-images/pepper-100g.webp','Raw Rice':'/product-images/raw-rice-1kg-v4.png',
+  Rice:'/product-images/rice-5kg.webp','Sambar Powder':'/product-images/sambar-powder-100g.webp',Sooji:'/product-images/sooji-500g.png',
+  Soombu:'/product-images/soombu-100g.webp',Sugar:'/product-images/sugar-500g.webp',Tamarind:'/product-images/tamarind-500g.webp',
+  'Toor Dal':'/product-images/toor-dal-1kg.webp',
+};
 async function main() {
   const snapshot = await firestore.collection('products').get();
   const existing = new Map(snapshot.docs.map(doc => [`${doc.data().name}|${doc.data().unit}`, doc]));
@@ -34,7 +42,7 @@ async function main() {
   }
   for (const [name, unit, price, categoryId] of products) {
     const old = existing.get(`${name}|${unit}`); const productId = old?.id || `${slug(name)}-${slug(unit)}`;
-    const imageUrl = old?.data().imageUrl || images[name] || '/product-images/nelture-grocery-fallback.png';
+    const imageUrl = images[name] || old?.data().imageUrl || '/product-images/nelture-grocery-fallback.png';
     batch.set(firestore.collection('products').doc(productId), { name, brand:'', unit, price, mrp:price, stock:100, categoryId, imageUrl, active:true, updatedAt:FieldValue.serverTimestamp(), ...(old ? {} : { createdAt:FieldValue.serverTimestamp() }) }, { merge:true });
     rows.push({ product_id:productId, name, brand:'', unit, price, mrp:price, stock:100, category_id:categoryId, image_url:imageUrl, active:true, created_at:timestamp, updated_at:timestamp });
   }
